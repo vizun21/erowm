@@ -25,7 +25,7 @@ SECRET_KEY = '%llwr%tlpdm!5mj!s*nz&%s+mrn$^&&je-^f3gp!r1v%8zi5!z'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['erowm.com', 'www.erowm.com']
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.humanize',
     'django_crontab',
     'accounting',
+    'childcare',
 ]
 
 MIDDLEWARE = [

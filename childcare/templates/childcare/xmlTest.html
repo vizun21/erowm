@@ -1,0 +1,19 @@
+{% load static %}
+xmlTest<br>
+{{ root }}<br><br>
+
+------- user list -------<br>
+{% for user in root %}
+	{{ user.tag }} : {{ user }}<br>
+{% endfor %}
+<br>
+
+------- user info list -------<br>
+{% for user in root %}
+        {% for info in user %}
+                {{ info.tag }} : {{ info.text }}<br>
+        {% endfor %}<br>
+{% endfor %}
+
+
+{{ content }}
