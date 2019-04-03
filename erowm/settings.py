@@ -25,7 +25,7 @@ SECRET_KEY = '%llwr%tlpdm!5mj!s*nz&%s+mrn$^&&je-^f3gp!r1v%8zi5!z'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ['erowm.com', 'www.erowm.com']
 
 
 # Application definition

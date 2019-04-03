@@ -1,5 +1,6 @@
 {% load static %}
 xmlTest<br>
+<!--
 {{ root }}<br><br>
 
 ------- user list -------<br>
@@ -14,6 +15,11 @@ xmlTest<br>
                 {{ info.tag }} : {{ info.text }}<br>
         {% endfor %}<br>
 {% endfor %}
+-->
 
 
-{{ content }}
+{{ content }}<br>
+{{ content.status_code }}<br>
+{{ content.content }}<br>
+
+

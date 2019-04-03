@@ -9,10 +9,10 @@ import urllib
 
 import xml.etree.ElementTree as ET
 def xmlTest(request):
-    doc = ET.parse("childcare/xmlTest.xml")
-    root = doc.getroot()
+    #doc = ET.parse("childcare/xmlTest.xml")
+    #root = doc.getroot()
     #print(doc)
-    doc = '<?xml version="1.0" encoding="UTF-8"?>\n<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xxx="https://api.childcare.go.kr/mediate/soap/acntRpt/acRptStacnt.ws/acRptStacnt.ws">\n<soap:Header></soap:Header>\n<soap:Body>\n<xxx:acRptStacnt>\n<Request>\n<S_AUTH_KEY>C81AECA1AE8342A394039DF8E1596508</S_AUTH_KEY>\n<C_AUTH_KEY></C_AUTH_KEY>\n<ACYEAR>2019</ACYEAR>\n<STR>\n<GB>1</GB>\n<CD>111</CD>\n<CSCNN>100000</CSCNN>\n<RMK><![CDATA[\n비고1\n]]></RMK>\n</STR>\n<STR>\n<GB>2</GB>\n<CD>212</CD>\n<CSCNN>300000</CSCNN>\n<RMK><![CDATA[\n비고2\n]]></RMK>\n</STR>\n</Request>\n</xxx:acRptStacnt>\n</soap:Body>\n</soap:Envelope>'
+    #doc = '<?xml version="1.0" encoding="UTF-8"?>\n<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xxx="https://api.childcare.go.kr/mediate/soap/acntRpt/acRptStacnt.ws/acRptStacnt.ws">\n<soap:Header></soap:Header>\n<soap:Body>\n<xxx:acRptStacnt>\n<Request>\n<S_AUTH_KEY>C81AECA1AE8342A394039DF8E1596508</S_AUTH_KEY>\n<C_AUTH_KEY></C_AUTH_KEY>\n<ACYEAR>2019</ACYEAR>\n<STR>\n<GB>1</GB>\n<CD>111</CD>\n<CSCNN>100000</CSCNN>\n<RMK><![CDATA[\n비고1\n]]></RMK>\n</STR>\n<STR>\n<GB>2</GB>\n<CD>212</CD>\n<CSCNN>300000</CSCNN>\n<RMK><![CDATA[\n비고2\n]]></RMK>\n</STR>\n</Request>\n</xxx:acRptStacnt>\n</soap:Body>\n</soap:Envelope>'
     
     #try:
     #conn = _HTTPConnection("api.childcare.go.kr")
@@ -24,13 +24,13 @@ def xmlTest(request):
     #content = conn.getresponse().read()
     #conn.close()
     import requests
-    url = "https://api.childcare.go.kr/mediate/soap/acntRpt/acRptStacnt.ws/acRptStacnt.ws"
-    headers = {'content-type': 'text/xml'}
+    url = "https://api.childcare.go.kr/route/soap/acntRpt/acRptStacnt.ws/acRptStacnt.ws"
+    headers = {'content-type': 'application/soap+xml'}
     body = """<?xml version="1.0" encoding="UTF-8"?>
-            <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xxx="https://api.childcare.go.kr/mediate/soap/acntRpt/acRptStacnt.ws/acRptStacnt.ws">
+            <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
                 <soap:Header></soap:Header>
                 <soap:Body>
-                    <xxx:acRptStacnt>
+                    <soap:acRptStacnt>
                         <Request>
                             <S_AUTH_KEY>C81AECA1AE8342A394039DF8E1596508</S_AUTH_KEY>
                             <C_AUTH_KEY></C_AUTH_KEY>
@@ -48,11 +48,30 @@ def xmlTest(request):
                                 <RMK><![CDATA[\n비고2\n]]></RMK>
                             </STR>
                         </Request>
-                    </xxx:acRptStacnt>
+                    </soap:acRptStacnt>
                 </soap:Body>
             </soap:Envelope>"""
-    content = requests.post(url, data=body, headers=headers)
-    return render(request, 'childcare/xmlTest.html', {'root': root, 'content': content})
+    content = requests.post(url, data=body.encode('utf-8'), headers=headers, verify=False)
+    print(content)
+    print(content.status_code)
+    print(content.content)
+    '''
+    <env:Envelope xmlns:env="http://schemas.xmlsoap.org/soap/envelope/">
+        <env:Header/>
+        <env:Body>
+            <env:Fault>
+                <env:Code>Server</env:Code>
+                <env:Reason>
+                    com.megatus.megaengine.route.runtime.RouteRuntimeException: 
+                    com.mobicware.framework.invoker.InvokerException: 
+                    org.apache.http.client.ClientProtocolException
+                </env:Reason>
+            </env:Fault>
+        </env:Body>
+    </env:Envelope>
+    '''
+    content.close
+    return render(request, 'childcare/xmlTest.html', {'content': content})
     #except:
         #import sys
         #print(sys.exc_info()[:2])
