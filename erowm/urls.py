@@ -28,4 +28,5 @@ urlpatterns = [
     url(r'^accounts/signup/$', views.signup, name='signup'),
     url(r'^accounts/signup_done/$', views.signup_done, name='signup_done'),
     url(r'', include('accounting.urls')),
+    url(r'childcare', include('childcare.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

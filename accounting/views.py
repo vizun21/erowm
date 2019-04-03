@@ -1583,7 +1583,10 @@ def print_voucher(request, voucher_type):
 
     data_list = []
     for ymd in ymd_list:
-        item_list = Item.objects.filter(transaction__business=business, transaction__Bkdate=ymd, paragraph__subsection__type=filter_type).exclude(paragraph__subsection__code=0).distinct()
+        if voucher_type == 'revenue':
+            item_list = Item.objects.filter(transaction__business=business, transaction__Bkdate=ymd, transaction__Bkinput__gt=0, paragraph__subsection__type=filter_type).exclude(paragraph__subsection__code=0).distinct()
+        else:
+            item_list = Item.objects.filter(transaction__business=business, transaction__Bkdate=ymd, transaction__Bkoutput__gt=0, paragraph__subsection__type=filter_type).exclude(paragraph__subsection__code=0).distinct()
         for item in item_list:
             transaction = []
             if voucher_type == 'revenue':
@@ -1889,7 +1892,10 @@ def print_returned_voucher(request, voucher_type):
 
     data_list = []
     for ymd in ymd_list:
-        item_list = Item.objects.filter(transaction__business=business, transaction__Bkdate=ymd, paragraph__subsection__type=filter_type).exclude(paragraph__subsection__code=0).distinct()
+        if voucher_type == 'revenue':
+            item_list = Item.objects.filter(transaction__business=business, transaction__Bkdate=ymd, transaction__Bkinput__lt=0, paragraph__subsection__type=filter_type).exclude(paragraph__subsection__code=0).distinct()
+        else:
+            item_list = Item.objects.filter(transaction__business=business, transaction__Bkdate=ymd, transaction__Bkoutput__lt=0, paragraph__subsection__type=filter_type).exclude(paragraph__subsection__code=0).distinct()
         for item in item_list:
             if voucher_type == 'revenue':
                 transaction = Transaction.objects.filter(business=business, Bkdate=ymd, item=item, Bkinput__lt=0)
