@@ -2296,19 +2296,27 @@ def upload_transaction(request):
     wb = load_workbook(filename='./media/'+upfile.name)
     sheet = wb.worksheets[0]
     try:
-        Bkacct = Account.objects.get(account_number=sheet['B1'].value)
+        Bkacct = Account.objects.get(business=business, account_number=sheet['B1'].value)
     except:
         return HttpResponse("<script>alert('등록되지 않은 계좌입니다. 엑셀파일의 계좌번호를 확인해주세요.');history.back();</script>")
 
     num = TBLBANK.objects.all().order_by('-Bkid').first().Bkid + 1
     for index in range(5, sheet.max_row + 1):
         if sheet['A'+str(index)] and sheet['B'+str(index)] and sheet['E'+str(index)] and (sheet['C'+str(index)] or sheet['D'+str(index)]):
-            Bkinput = 0
-            Bkoutput = 0
-            if sheet['C'+str(index)].value and sheet['C'+str(index)].value > 0:
-                Bkinput = sheet['C'+str(index)].value
-            elif sheet['D'+str(index)].value and sheet['D'+str(index)].value > 0:
-                Bkoutput = sheet['D'+str(index)].value
+            if sheet['C'+str(index)].value and not sheet['D'+str(index)].value:
+                if sheet['C'+str(index)].value > 0:
+                    Bkinput = sheet['C'+str(index)].value
+                    Bkoutput = 0
+                elif sheet['C'+str(index)].value < 0:
+                    Bkinput = 0
+                    Bkoutput = sheet['C'+str(index)].value * -1
+            elif sheet['D'+str(index)].value and not sheet['C'+str(index)].value:
+                if sheet['D'+str(index)].value > 0:
+                    Bkinput = 0
+                    Bkoutput = sheet['D'+str(index)].value
+                elif sheet['D'+str(index)].value < 0:
+                    Bkinput = sheet['D'+str(index)].value * -1
+                    Bkoutput = 0
 
             datetimecell = sheet['A'+str(index)].value
             if type(datetimecell) == datetime.datetime:
@@ -2354,7 +2362,7 @@ def upload_transaction2(request):
     wb = load_workbook(filename='./media/'+upfile.name)
     sheet = wb.worksheets[0]
     try:
-        Bkacct = Account.objects.get(account_number=sheet['B1'].value)
+        Bkacct = Account.objects.get(business=business, account_number=sheet['B1'].value)
     except:
         created_file.delete()
         return HttpResponse("<script>alert('등록되지 않은 계좌입니다. 엑셀파일의 계좌번호를 확인해주세요.');history.back();</script>")
@@ -2362,12 +2370,20 @@ def upload_transaction2(request):
     num = TBLBANK.objects.all().order_by('-Bkid').first().Bkid + 1
     for index in range(5, sheet.max_row + 1):
         if sheet['A'+str(index)] and sheet['B'+str(index)] and sheet['C'+str(index)] and sheet['F'+str(index)] and (sheet['D'+str(index)] or sheet['E'+str(index)]):
-            Bkinput = 0
-            Bkoutput = 0
-            if sheet['D'+str(index)].value and sheet['D'+str(index)].value > 0:
-                Bkinput = sheet['D'+str(index)].value
-            elif sheet['E'+str(index)].value and sheet['E'+str(index)].value > 0:
-                Bkoutput = sheet['E'+str(index)].value
+            if sheet['D'+str(index)].value and not sheet['E'+str(index)].value:
+                if sheet['D'+str(index)].value > 0:
+                    Bkinput = sheet['D'+str(index)].value
+                    Bkoutput = 0
+                elif sheet['D'+str(index)].value < 0:
+                    Bkinput = 0
+                    Bkoutput = sheet['D'+str(index)].value * -1
+            elif sheet['E'+str(index)].value and not sheet['D'+str(index)].value:
+                if sheet['E'+str(index)].value > 0:
+                    Bkinput = 0
+                    Bkoutput = sheet['E'+str(index)].value
+                elif sheet['E'+str(index)].value < 0:
+                    Bkinput = sheet['E'+str(index)].value * -1
+                    Bkoutput = 0
 
             datecell = sheet['A'+str(index)].value
             if type(datecell) == datetime.datetime:
