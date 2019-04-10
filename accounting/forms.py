@@ -6,7 +6,7 @@ from django.core.exceptions import NON_FIELD_ERRORS
 
 from .models import Profile, Owner, Business, Sales, Agency, Account
 from .models import Subsection, Paragraph, Item, Subdivision
-from .models import TBLBANK
+from .models import TBLBANK, Transaction
 
 class SignupForm(UserCreationForm):
     email = forms.EmailField(
@@ -527,3 +527,25 @@ class TblbankDirectForm(forms.ModelForm):
         self.fields['Bkdate'].widget.attrs['readonly'] = True
         self.fields['Bkoutput'].widget.attrs['style'] = 'display:none'
         self.fields['Bkoutput'].widget.attrs['value'] = 0
+
+class TransactionEditForm(forms.ModelForm):
+    Bkdate = forms.DateField(
+        label="거래일자",
+        widget = forms.DateInput(attrs={'class': 'vDateField'})
+    )
+
+    class Meta:
+        model = Transaction
+        fields = ('Bkdate', 'item', 'Bkjukyo', 'Bkinput', 'Bkoutput')
+        labels = {
+            'item': '계정',
+            'Bkjukyo': '적요',
+            'Bkinput': '수입',
+            'Bkoutput': '지출',
+        }
+
+    def __init__(self, *args, **kwargs):
+        super(TransactionEditForm, self).__init__(*args, **kwargs)
+        self.fields['Bkdate'].widget.attrs['readonly'] = True
+        self.fields['Bkinput'].widget.attrs['readonly'] = True
+        self.fields['Bkoutput'].widget.attrs['readonly'] = True

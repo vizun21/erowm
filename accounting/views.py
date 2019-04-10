@@ -8,7 +8,7 @@ from .models import Subsection, Paragraph, Item, Subdivision
 from .models import Transaction, TBLBANK, Budget, Deadline
 from .forms import SignupForm, OwnerForm, BusinessForm, UserForm, SalesForm, AgencyForm, EditOwnerForm, AccountForm
 from .forms import SubsectionForm, ParagraphForm, ItemForm, SubdivisionForm
-from .forms import TblbankDirectForm
+from .forms import TblbankDirectForm, TransactionEditForm
 from .crypto import AESCipher
 
 from django.contrib.auth import authenticate, login
@@ -633,7 +633,8 @@ def regist_transaction(request):
         for check in tr_check_list:
             Bkid=tr_list[int(check)]
             tblbank_tr = TBLBANK.objects.get(Bkid=Bkid)
-            Bkdivision = Transaction.objects.filter(Bkid=Bkid).filter(Bkdivision__gt=0).count() + 1
+            Bkdivision = 1
+            #Bkdivision = Transaction.objects.filter(Bkid=Bkid).filter(Bkdivision__gt=0).count() + 1
             Bkdate = Bkdate_list[int(check)]
             start_date = datetime.datetime.strptime(Bkdate[:8]+'01', "%Y-%m-%d")
 
@@ -1030,11 +1031,14 @@ def regist_division(request):
             )
 
             update_list = Transaction.objects.filter(business=business, Bkdate__gt=Bkdate, Bkdate__lt=a_month_later)
+            print(update_list)
             for update in update_list:
-                if inoutType == "수입":
+                print(Bkinout[r])
+                if inoutType == "input":
                     update.Bkjango = int(update.Bkjango) + int(Bkinout[r])
-                if inoutType == "지출":
+                if inoutType == "output":
                     update.Bkjango = int(update.Bkjango) - int(Bkinout[r])
+                print(update.Bkjango)
                 update.save()
 
             tr, created = TBLBANK.objects.get_or_create(business=business, Bkid=Bkid, Bkdivision=r, Mid=Mid, Bkacctno=tblbank_tr.Bkacctno, Bkname=tblbank_tr.Bkname, Bkdate=tblbank_tr.Bkdate)
@@ -1853,6 +1857,57 @@ def regist_transaction_direct(request):
             elif transaction.Bkoutput > 0:
                 update.Bkjango = update.Bkjango - transaction.Bkoutput
             update.save()
+
+    return HttpResponse('<script type="text/javascript">window.close(); window.opener.parent.location.reload(); window.parent.location.href="/";</script>')
+
+@login_required(login_url='/')
+def popup_transaction_edit(request):
+    pk = request.GET.get('pk')
+    business = get_object_or_404(Business, pk=request.session['business'])
+    transaction = get_object_or_404(Transaction, id=pk, business=business)
+    tblbankform = TransactionEditForm(instance=transaction)
+    tblbankform.fields['item'].queryset = Item.objects.filter(paragraph__subsection__institution = business.type3, paragraph__subsection__type=transaction.item.paragraph.subsection.type).exclude(code=0)
+    inoutType = transaction.item.paragraph.subsection.type
+    if inoutType == "수입":
+        tblbankform.fields['Bkoutput'].widget.attrs['style'] = 'display:none'
+        tblbankform.fields['Bkoutput'].widget.attrs['value'] = 0
+    else:
+        tblbankform.fields['Bkinput'].widget.attrs['style'] = 'display:none'
+        tblbankform.fields['Bkinput'].widget.attrs['value'] = 0
+    return render(request,'accounting/popup_transaction_edit.html', {'transactionform': tblbankform, 'year': transaction.Bkdate.year, 'month': transaction.Bkdate.month, 'pk': pk})
+
+@login_required(login_url='/')
+def edit_transaction(request):
+    business = get_object_or_404(Business, pk=request.session['business'])
+    today = datetime.datetime.now()
+    inout_type = request.POST.get('inout')
+    remark = request.POST.get('remark')
+    pk = request.POST.get('pk', '')
+    transaction = get_object_or_404(Transaction, pk=pk)
+    transactionform = TransactionEditForm(request.POST, instance=transaction)
+
+    try:
+        close = Deadline.objects.get(business=business,year=Bkdate[:4],month=Bkdate[5:7])
+        if close.regdatetime:
+            return HttpResponse("<script>alert('해당월은 마감완료되었습니다.');history.back();</script>")
+    except:
+        pass
+    
+    #금액수정불가, 관항목만 수정가능
+    if transactionform.is_valid():
+        tr = transactionform.save(commit=False)
+        if tr.Bkinput == None:
+            tr.Bkinput = 0
+        if tr.Bkoutput == None:
+            tr.Bkoutput = 0
+        tr.regdatetime = today
+        tr.save()
+        
+        #TBLBANK테이블 동일한 항목 update
+        update_tr = TBLBANK.objects.get(business=business, Bkid=tr.Bkid, Bkdivision=tr.Bkdivision)
+        update_tr.item = tr.item
+        update_tr.sub_Bkjukyo = tr.Bkjukyo
+        update_tr.save()
 
     return HttpResponse('<script type="text/javascript">window.close(); window.opener.parent.location.reload(); window.parent.location.href="/";</script>')
 

@@ -339,7 +339,9 @@
 							<td class="text-right">{{ dt.Bkinput|default:''|intcomma }}</td>
 							<td class="text-right">{{ dt.Bkoutput|default:''|intcomma }}</td>
 							<td class="text-right">{{ dt.Bkjango|default:'0'|intcomma }}</td>
-							<td></td>
+							<td>
+								<a href="#" onclick="window.open('{% url "popup_transaction_edit" %}?pk={{dt.id}}', '거래수정','width=1000, height=300, scrollbars=1');" class="btn btn-primary btn-sm py-0">수정</a>
+							</td>
 						</tr>
 						{% endfor %}
 					</tbody>
