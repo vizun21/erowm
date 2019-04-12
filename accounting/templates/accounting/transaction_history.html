@@ -212,7 +212,13 @@
 							</td>
 							<td class="text-right">{{ dt.Bkinput|default:''|intcomma }}</td>
 							<td class="text-right">{{ dt.Bkoutput|default:''|intcomma }}</td>
-							<td class="text-right">{{ dt.Bkjango|default:'0'|intcomma }}</td>
+							<td class="text-right">
+								{% if dt.Bkdivision == 1 %}
+								{{ dt.Bkjango|default:'0'|intcomma }}
+								{% else %}
+								{{ dt.Bkjango|default:''|intcomma }}
+								{% endif %}
+							</td>
 							<td>
 								{% if not dt.regdatetime %}
 								<a href="#" onclick="window.open('{% url "popup_transaction_division" Bkid=dt.Bkid %}?month={{ month }}', '분할등록','width=1000, height=300, scrollbars=1');" class="btn btn-primary btn-sm py-0">분할</a>

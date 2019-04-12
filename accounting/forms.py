@@ -529,15 +529,11 @@ class TblbankDirectForm(forms.ModelForm):
         self.fields['Bkoutput'].widget.attrs['value'] = 0
 
 class TransactionEditForm(forms.ModelForm):
-    Bkdate = forms.DateField(
-        label="거래일자",
-        widget = forms.DateInput(attrs={'class': 'vDateField'})
-    )
-
     class Meta:
         model = Transaction
         fields = ('Bkdate', 'item', 'Bkjukyo', 'Bkinput', 'Bkoutput')
         labels = {
+            'Bkdate': '거래일자',
             'item': '계정',
             'Bkjukyo': '적요',
             'Bkinput': '수입',
@@ -549,3 +545,6 @@ class TransactionEditForm(forms.ModelForm):
         self.fields['Bkdate'].widget.attrs['readonly'] = True
         self.fields['Bkinput'].widget.attrs['readonly'] = True
         self.fields['Bkoutput'].widget.attrs['readonly'] = True
+        self.fields['Bkdate'].widget.attrs['style'] = "background-color:#ddd"
+        self.fields['Bkinput'].widget.attrs['style'] = "background-color:#ddd"
+        self.fields['Bkoutput'].widget.attrs['style'] = "background-color:#ddd"
