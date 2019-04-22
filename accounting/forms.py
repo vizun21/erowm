@@ -186,7 +186,7 @@ class BusinessForm(forms.ModelForm):
 
     class Meta:
         model = Business
-        fields = ('name', 'place_name', 'reg_number', 'owner_name', 'owner_reg_number1', 'owner_reg_number2', 'type1', 'type2', 'type3','cellphone', 'phone', 'fax', 'email', 'zip_number', 'address', 'detailed_address',)
+        fields = ('name', 'place_name', 'reg_number', 'owner_name', 'owner_reg_number1', 'owner_reg_number2', 'type1', 'type2', 'type3','cellphone', 'phone', 'fax', 'email', 'zip_number', 'address', 'detailed_address')
         labels = {
                 'name': '사업명',
                 'place_name': '사업장명',
@@ -548,3 +548,21 @@ class TransactionEditForm(forms.ModelForm):
         self.fields['Bkdate'].widget.attrs['style'] = "background-color:#ddd"
         self.fields['Bkinput'].widget.attrs['style'] = "background-color:#ddd"
         self.fields['Bkoutput'].widget.attrs['style'] = "background-color:#ddd"
+
+class AuthKeyForm(forms.ModelForm):
+    s_auth_key = forms.RegexField(
+        regex=r'^[A-Z0-9]{32}$',
+        label='인증키',
+        max_length=32,
+        error_messages = {
+            'invalid': "인증키를 다시 확인해주세요.",
+        },
+        widget=forms.TextInput(
+            attrs={
+                'size': '35',
+            }
+        )
+    )
+    class Meta:
+        model = Business
+        fields = ('s_auth_key',)

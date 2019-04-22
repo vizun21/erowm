@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xxx="https://api.childcare.go.kr/mediate/soap/acntRpt/acRptStacnt.ws/acRptStacnt.ws">
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xxx="https://api.childcare.go.kr/route/soap/acntRpt/acRptStacnt.ws/acRptStacnt.ws">
 	<soap:Header></soap:Header>
 	<soap:Body>
 		<xxx:acRptStacnt>
 			<Request>
-				<S_AUTH_KEY>C81AECA1AE8342A394039DF8E1596508</S_AUTH_KEY>
-				<C_AUTH_KEY></C_AUTH_KEY>
+				<S_AUTH_KEY>A56AE60160DB4FE98E8B445F18558AD2</S_AUTH_KEY>
+				<C_AUTH_KEY>FAB53436117CB394FDAFFE38C2676D77</C_AUTH_KEY>
 				<ACYEAR>2019</ACYEAR>
 				<STR>
 					<GB>1</GB>

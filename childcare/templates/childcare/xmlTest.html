@@ -1,6 +1,5 @@
 {% load static %}
 xmlTest<br>
-<!--
 {{ root }}<br><br>
 
 ------- user list -------<br>
@@ -15,7 +14,12 @@ xmlTest<br>
                 {{ info.tag }} : {{ info.text }}<br>
         {% endfor %}<br>
 {% endfor %}
--->
+
+{{ body }}
+
+{% for sr in sr_list %}
+{{ sr.GB }} / {{ sr.CD }} / {{ sr.AMT }} / {{ sr.CNT }}<br>
+{% endfor %}
 
 
 {{ content }}<br>
@@ -23,3 +27,4 @@ xmlTest<br>
 {{ content.content }}<br>
 
 
+{{ result }}<br>

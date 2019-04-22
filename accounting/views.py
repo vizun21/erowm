@@ -2318,6 +2318,24 @@ def undo_close(request):
         response['Location'] += '?year='+year   #회기년도
     return response
 
+@login_required(login_url='/')
+def authkey_list(request):
+    business = get_object_or_404(Business, pk=request.session['business'])
+    return render(request, 'accounting/authkey_list.html', {'business_management': 'active', 'authkey_page': 'active', 'business': business})
+
+@login_required(login_url='/')
+def authkey_edit(request):
+    from .forms import AuthKeyForm
+    business = get_object_or_404(Business, pk=request.session['business'])
+    if request.method == "POST":
+        form = AuthKeyForm(request.POST, instance=business)
+        if form.is_valid():
+            form.save()
+            return redirect('authkey_list')
+    else:
+        form = AuthKeyForm()
+    return render(request, 'accounting/authkey_edit.html', {'business_management': 'active', 'authkey_page': 'active', 'business': business, 'form': form})
+
 #--------------파일다운로드-------------
 from .models import UploadFile
 

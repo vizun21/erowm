@@ -88,6 +88,9 @@ urlpatterns = [
     url(r'^id_check/$', views.id_check, name='id_check'),
     url(r'^account_check/$', views.account_check, name='account_check'),
     url(r'^change_item_option/$', views.change_item_option, name='change_item_option'),
+
+    url(r'^authkey_list/$', views.authkey_list, name='authkey_list'),
+    url(r'^authkey_edit/$', views.authkey_edit, name='authkey_edit'),
     
     url(r'^set_proofnum/$', views.set_proofnum, name='set_proofnum'),
 
