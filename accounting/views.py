@@ -18,7 +18,8 @@ from django.utils import timezone
 from django.utils.dateformat import DateFormat
 from dateutil.relativedelta import relativedelta
 
-from django.db.models import Sum, Count, Case, When
+import math
+from django.db.models import Sum, Count, Case, When, Q, Min
 from django.db.models.functions import Coalesce
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
@@ -44,7 +45,6 @@ def main(request):
             return redirect("user_transform")
         else:
             return redirect("business_list")
-    return render(request, 'accounting/main.html')
 
 def id_check(request):
     id_check = False
@@ -132,10 +132,145 @@ def business_edit(request, pk):
     return render(request, 'accounting/business_edit.html', {'form': form, 'business': business})
 
 @login_required(login_url='/')
+def home(request):
+    business = get_object_or_404(Business, pk=request.session['business'])
+    today = datetime.datetime.now()
+    year = request.GET.get('year', today.strftime("%Y"))
+    month = request.GET.get('month', today.strftime("%m"))
+    inout_type = request.GET.get('type', 'input')
+
+    if int(month) < 3:
+        ac_year = (today - relativedelta(years=1)).strftime("%Y")
+    else:
+        ac_year = year
+
+    start_date = datetime.datetime.strptime(year+"-"+month+"-01", "%Y-%m-%d")
+    end_date = start_date + relativedelta(months=1)
+    
+    #--마감자료
+    try:
+        deadline = Deadline.objects.get(business=business, year=year, month=month)
+    except:
+        deadline = None
+    #--마감자료 END
+
+    #--기타필요경비, 특별활동비, 장/단기 차입금 예산 결산 자료
+    data_list2 = Item.objects.filter(
+        paragraph__subsection__institution = business.type3
+    ).filter(Q(context__contains="기타 필요경비")|Q(context__contains="특별활동비")|Q(context__contains="차입금")
+    ).annotate(
+        budget_amount=Coalesce(Sum(Case(
+            When(budget__business = business, then=Case(
+                When(budget__year = ac_year, then='budget__price'))))), 0)
+    ).exclude(code=0).order_by(
+        'paragraph__subsection__type',
+        'paragraph__subsection__code',
+        'paragraph__code',
+        'code'
+    )
+
+    data_list = Item.objects.filter(
+        paragraph__subsection__institution = business.type3
+    ).filter(Q(context__contains="기타 필요경비")|Q(context__contains="특별활동비")|Q(context__contains="차입금")
+    ).annotate(
+        settlement_amount=Coalesce(Sum(Case(
+            When(transaction__business = business, then=Case(
+                When(transaction__Bkdate__gte = start_date, then=Case(
+                    When(transaction__Bkdate__lt = end_date, then=Case(
+                        When(
+                            transaction__Bkoutput=0,
+                            then='transaction__Bkinput'
+                        ),
+                        default='transaction__Bkoutput')))))))), 0)
+    ).exclude(code=0).order_by(
+        'paragraph__subsection__type',
+        'paragraph__subsection__code',
+        'paragraph__code',
+        'code'
+    )
+
+    for idx, data in enumerate(data_list):
+        data.budget_amount = math.ceil(data_list2[idx].budget_amount/12)
+        try:
+            data.rate_of_change = round(data.settlement_amount/data.budget_amount, 2)
+        except:
+            data.rate_of_change = '-'
+    #--기타필요경비, 특별활동비, 장/단기 차입금 예산 결산 자료 END
+
+    #--중복거래 내역
+    duplicate_tr = Transaction.objects.filter(
+        business=business, Bkdate__gte=start_date, Bkdate__lt=end_date
+    ).values(
+        'Bkdate', 'item__paragraph__subsection__type', 'item__context', 'item',
+        'Bkjukyo', 'Bkinput', 'Bkoutput'
+    ).annotate(price=Case(When(Bkinput__gt=0, then='Bkinput'), default='Bkoutput')
+    ).annotate(count=Count('Bkdate')).filter(count__gte=2)
+    #--중복거래 내역 END
+    
+    #--세입, 세출에 따른 목별 예산 결산 자료
+    if inout_type == "input":
+        filter_type = "수입"
+        budget_type = "revenue"
+    else:
+        filter_type = "지출"
+        budget_type = "expenditure"
+
+    try:
+        filter_budget_type = Budget.objects.filter(business=business, year=ac_year, type__icontains=budget_type).order_by('type').last().type
+    except:
+        filter_budget_type = budget_type
+
+    budget_list = Item.objects.filter(
+        paragraph__subsection__institution = business.type3, paragraph__subsection__type=filter_type
+    ).annotate(
+        budget_amount=Coalesce(Sum(Case(
+            When(budget__business = business, then=Case(
+                When(budget__year = ac_year, then=Case(When(
+                    budget__type = filter_budget_type, then='budget__price'))))))), 0)
+    ).exclude(code=0).order_by(
+        'paragraph__subsection__type',
+        'paragraph__subsection__code',
+        'paragraph__code',
+        'code'
+    )
+
+    item_list = Item.objects.filter(
+        paragraph__subsection__institution = business.type3, paragraph__subsection__type=filter_type
+    ).annotate(
+        settlement_amount=Coalesce(Sum(Case(
+            When(transaction__business = business, then=Case(
+                When(transaction__Bkdate__gte = start_date, then=Case(
+                    When(transaction__Bkdate__lt = end_date, then=Case(
+                        When(
+                            transaction__Bkoutput=0,
+                            then='transaction__Bkinput'
+                        ),
+                        default='transaction__Bkoutput')))))))), 0)
+    ).exclude(code=0).order_by(
+        'paragraph__subsection__type',
+        'paragraph__subsection__code',
+        'paragraph__code',
+        'code'
+    )
+
+    for idx, item in enumerate(item_list):
+        item.budget_amount = math.ceil(budget_list[idx].budget_amount/12)
+        try:
+            item.rate_of_change = round(item.settlement_amount/item.budget_amount, 2)
+        except:
+            item.rate_of_change = '-'
+    #--세입, 세출에 따른 목별 예산 결산 자료 END
+
+    return render(request, 'accounting/home.html', {
+        'business': business, 'y_range': range(today.year,1999,-1), 'm_range': range(1,13),
+        'year': int(year), 'month': int(month), 'item_list': item_list, 'type': inout_type,
+        'deadline': deadline, 'data_list': data_list, 'duplicate_tr': duplicate_tr })
+
+@login_required(login_url='/')
 def transform_business(request, pk):
     business = get_object_or_404(Business, pk=pk)
     request.session['business'] = business.pk
-    return redirect('business_info')
+    return redirect('home')
 
 @login_required(login_url='/')
 def retransform_business(request):
