@@ -69,6 +69,7 @@ urlpatterns = [
     url(r'^print/(?P<budget_type>[a-z]\w+)_settlement2/$', views.print_budget_settlement2, name='print_budget_settlement2'),
     url(r'^print/transaction/$', views.print_transaction, name='print_transaction'),
     url(r'^print/general_ledger/$', views.print_general_ledger, name='print_general_ledger'),
+    url(r'^print/voucher/$', views.print_voucher2, name='print_voucher2'),
     url(r'^print/(?P<voucher_type>[a-z]\w+)_voucher/$', views.print_voucher, name='print_voucher'),
     url(r'^popup_returned_transaction/$', views.popup_returned_transaction, name='popup_returned_transaction'),
     url(r'^regist/returned_transaction$', views.regist_returned_transaction, name='regist_returned_transaction'),

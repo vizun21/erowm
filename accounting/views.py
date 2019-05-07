@@ -1718,7 +1718,6 @@ def print_voucher(request, voucher_type):
         ymd_list.append(transaction.Bkdate)
     ymd_list = list(set(ymd_list))
     ymd_list.sort()
-    
 
     data_list = []
     for ymd in ymd_list:
@@ -1743,6 +1742,18 @@ def print_voucher(request, voucher_type):
             data_list.append({'date': ymd, 'item': item})
 
     return render(request,'accounting/print_voucher.html', {'settlement_management': 'active', 'master_login': request.session['master_login'], 'business': business, 'year': year, 'month': month, 'year2': year2, 'month2': month2, 'data_list': data_list, 'voucher_type': voucher_type})
+
+@login_required(login_url='/')
+def print_voucher2(request):
+    business = get_object_or_404(Business, pk=request.session['business'])
+    pk = request.GET.get('pk')
+    transaction = get_object_or_404(Transaction, id=pk, business=business)
+    if transaction.item.paragraph.subsection.type == "수입":
+        transaction.sum_ko = readNumber(str(transaction.Bkinput))
+    else:
+        transaction.sum_ko = readNumber(str(transaction.Bkoutput))
+
+    return render(request,'accounting/print_voucher2.html', {'settlement_management': 'active', 'master_login': request.session['master_login'], 'business': business, 'transaction': transaction})
 
 @login_required(login_url='/')
 def popup_returned_transaction(request):
@@ -2390,7 +2401,7 @@ def close_list(request):
 
     for ym in ym_list:
         try:
-            get_deadline = Deadline.objects.get(year=ym['Bkdate__year'], month=ym['Bkdate__month'])
+            get_deadline = Deadline.objects.get(business=business, year=ym['Bkdate__year'], month=ym['Bkdate__month'])
             if get_deadline.regdatetime:
                 ym['close'] = 1
         except Deadline.DoesNotExist:
