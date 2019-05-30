@@ -19,15 +19,15 @@ def monthly_report(request):
     today = datetime.datetime.now()
     date = today - relativedelta(months=1)
     selected_year = request.GET.get('year', date.strftime("%Y"))
-    this_y = today.strftime("%Y")
+    this_y = date.strftime("%Y")
     this_m = date.strftime("%m")
     operation = "acRptMonthSum"
 
     if request.method == "GET":
         ym_range = []
         start_date = datetime.datetime.strptime(selected_year+"-03-01", "%Y-%m-%d")
-        for m in range(12):
-            temp_date = start_date + relativedelta(months=m)
+        for months in range(12):
+            temp_date = start_date + relativedelta(months=months)
             y = temp_date.strftime("%Y")
             m = temp_date.strftime("%m")
             try:
@@ -55,7 +55,7 @@ def monthly_report(request):
                 When(transaction__business = business, then=Case(
                     When(transaction__Bkdate__year = selected_year, then=Case(
                         When(transaction__Bkdate__month = this_m, then='id')))))))
-        ).exclude(code=0).order_by(
+        ).exclude(code=0).exclude(total_sum=0).exclude(count=0).order_by(
             'paragraph__subsection__type',
             'paragraph__subsection__code',
             'paragraph__code',
@@ -64,7 +64,7 @@ def monthly_report(request):
         #--END SR
 
         body =  "<S_AUTH_KEY>"+business.s_auth_key+"</S_AUTH_KEY>\n" + \
-                "<MON>"+date.strftime("%Y")+date.strftime("%m")+"</MON>\n"
+                "<MON>"+date.strftime("%Y")+this_m+"</MON>\n"
         for item in item_list:
             GB = "1" if item.paragraph.subsection.type=="수입" else "2"
             CD = str(item.paragraph.subsection.code)+str(item.paragraph.code)+str(item.code)
@@ -223,7 +223,8 @@ def settlement_report(request):
 
 
 def request_childcare(business, operation, year, gubun, body):
-    url = "https://api.childcare.go.kr/route/soap/acntRpt/"+operation+".ws/"+operation+".ws?wsdl"
+    #url = "https://api.childcare.go.kr/route/soap/acntRpt/"+operation+".ws/"+operation+".ws?wsdl"
+    url = "https://stgapi.childcare.go.kr/route/soap/acntRpt/"+operation+".ws/"+operation+".ws?wsdl"
     headers = {'content-type': 'application/soap+xml'}
     preXml = \
         '<?xml version="1.0"?>\n' + \
@@ -240,11 +241,16 @@ def request_childcare(business, operation, year, gubun, body):
         '</soap:Envelope>\n'
 
     reqMsg = preXml+body+tailXml
+    print(reqMsg)
+    print("============post===========")
     resMsg = requests.post(url, data=reqMsg.encode('utf-8'), headers=headers, verify=False)
+    print("============end==========")
+    print(resMsg.content)
     content = makeSimpleXml(resMsg.content.decode('utf-8'))
 
     record, created = Record.objects.get_or_create(business=business, operation=operation, year=year, gubun=gubun, defaults={'data': "", 'result_code': -1, 'result_msg': ""})
     record.data = reqMsg
+    print(resMsg.status_code)
     record.result_code = content[0]
     record.result_msg = content[1]
     record.regdatetime = datetime.datetime.now()
@@ -275,7 +281,7 @@ def show_record(request):
     record = get_object_or_404(Record, business=business, operation=operation, year=year, gubun=gubun)
     root = ET.fromstring(record.data)
     Body = root.find("{http://schemas.xmlsoap.org/soap/envelope/}Body")
-    Operation = Body.find("{https://api.childcare.go.kr/route/soap/acntRpt/"+operation+".ws/"+operation+".ws?wsdl}"+operation)
+    Operation = Body.find("{https://stgapi.childcare.go.kr/route/soap/acntRpt/"+operation+".ws/"+operation+".ws?wsdl}"+operation)
     Request = Operation.find("Request")
     r_list = Request.findall(roofName)
 
