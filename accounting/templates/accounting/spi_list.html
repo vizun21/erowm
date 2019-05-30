@@ -19,6 +19,7 @@
 					<th colspan=2>항</th>
 					<th colspan=2>목</th>
 					<th>내역</th>
+					<th>목수정</th>
 				</tr>
 			</thead>
 
@@ -40,6 +41,7 @@
 					<td class="align-middle">{{ item.code }}</td>
 					<td class="align-middle">{{ item.context }}</td>
 					<td class="align-middle">{{ item.text }}</td>
+					<td class="align-middle"><a href="{% url 'item_edit' pk=item.pk %}" class="btn btn-primary btn-sm">수정</a></td>
 				</tr>
 				{% endif %}
 				{% endfor %}

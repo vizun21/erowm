@@ -12,7 +12,10 @@ def transaction_pre_save(sender, instance, **kwargs):
             index = 0
         else:
             if type(instance.Bkdate) == datetime.datetime:
-                index = Transaction.objects.filter(business = instance.business, item__paragraph__subsection__type = instance.item.paragraph.subsection.type, Bkdate__year = instance.Bkdate.year, Bkdate__month = instance.Bkdate.month).order_by('-proofnum').first().proofnum + 1
+                try:
+                    index = Transaction.objects.filter(business = instance.business, item__paragraph__subsection__type = instance.item.paragraph.subsection.type, Bkdate__year = instance.Bkdate.year, Bkdate__month = instance.Bkdate.month).order_by('-proofnum').first().proofnum + 1
+                except:
+                    index = 1
             else:
                 try:
                     index = Transaction.objects.filter(business = instance.business, item__paragraph__subsection__type = instance.item.paragraph.subsection.type, Bkdate__year = instance.Bkdate[:4], Bkdate__month = instance.Bkdate[5:7]).order_by('-proofnum').first().proofnum + 1

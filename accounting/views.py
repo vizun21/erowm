@@ -956,6 +956,18 @@ def item_create(request):
     return render(request, 'accounting/item_edit.html', {'form': form})
 
 @login_required(login_url='/')
+def item_edit(request, pk):
+    item = Item.objects.get(pk=pk)
+    if request.method == "POST":
+        form = ItemForm(request.POST, instance=item)
+        if form.is_valid():
+            form.save()
+            return redirect('spi_list')
+    else:
+        form = ItemForm(instance=item)
+    return render(request, 'accounting/item_edit.html', {'form': form})
+
+@login_required(login_url='/')
 def subdivision_list(request):
     business = get_object_or_404(Business, pk=request.session['business'])
     subdivisions = Subdivision.objects.filter(business=business).order_by('item')
@@ -2510,7 +2522,7 @@ def upload_transaction(request):
     if upfile == None:
         return HttpResponse("<script>alert('파일을 선택해주세요.');history.back();</script>")
     upfile.name = str(ymd)+'_'+business.name+'_거래내역.xlsx'
-    UploadFile.objects.create(title=str(ymd)+'_'+business.name+'_거래내역', file=upfile, user=request.user)
+    created_file = UploadFile.objects.create(title=str(ymd)+'_'+business.name+'_거래내역', file=upfile, user=request.user)
 
     wb = load_workbook(filename='./media/'+upfile.name)
     sheet = wb.worksheets[0]
@@ -2645,6 +2657,83 @@ def upload_transaction2(request):
                 business=business
             )
         num += 1
+
+    return HttpResponse('<script type="text/javascript">window.close(); window.opener.parent.location.reload(); window.parent.location.href="/";</script>')
+
+
+from django.db import transaction
+
+@login_required(login_url='/')
+def upload_voucher(request):
+    business = get_object_or_404(Business, pk=request.session['business'])
+    today = datetime.datetime.now()
+    ymd = DateFormat(today).format("ymdHis")
+    upfile = request.FILES.get('file')
+    upload_type = request.POST.get('type')
+
+    if upfile == None:
+        return HttpResponse("<script>alert('파일을 선택해주세요.');history.back();</script>")
+    upfile.name = str(ymd)+'_'+business.name+'_현금출납장.xlsx'
+    created_file = UploadFile.objects.create(title=str(ymd)+'_'+business.name+'_현금출납장', file=upfile, user=request.user)
+
+    wb = load_workbook(filename='./media/'+upfile.name)
+    sheet = wb.worksheets[0]
+
+    num = TBLBANK.objects.all().order_by('-Bkid').first().Bkid + 1
+    error = ""
+    for index in range(2, sheet.max_row + 1):
+        sindex = str(index)
+        try:
+            if sheet['E'+sindex].value and not sheet['F'+sindex].value:
+                Bkinput = sheet['E'+sindex].value
+                Bkoutput = 0
+            elif sheet['F'+sindex].value and not sheet['E'+sindex].value:
+                Bkinput = 0
+                Bkoutput = sheet['F'+sindex].value
+
+            datetimecell = str(sheet['A'+sindex].value)
+            Bkdate = datetime.datetime.strptime(datetimecell, '%Y%m%d')
+
+            with transaction.atomic():
+                TBLBANK.objects.create(
+                    Bkid = num,
+                    Bkdivision = 1,
+                    Mid = request.user.username,
+                    Bkacctno = None,
+                    Bkname = None,
+                    Bkdate = Bkdate,
+                    Bkjukyo = sheet['B'+sindex].value,
+                    Bkinput = Bkinput,
+                    Bkoutput = Bkoutput,
+                    Bkjango = sheet['G'+sindex].value,
+                    business = business,
+                    direct = True
+                )
+
+                item = Item.objects.get(paragraph__subsection__institution=business.type3, context=sheet['C'+sindex].value.replace(" ", ""))
+
+                Transaction.objects.create(
+                    Bkid = num,
+                    Bkdivision = 1,
+                    Mid = request.user.username,
+                    Bkacctno = None,
+                    Bkname = None,
+                    Bkdate = Bkdate,
+                    Bkjukyo = sheet['B'+sindex].value,
+                    Bkinput = Bkinput,
+                    Bkoutput = Bkoutput,
+                    Bkjango = sheet['G'+sindex].value,
+                    business = business,
+                    regdatetime = today,
+                    item = item
+                )
+            num += 1
+        except Exception as e:
+            print (e)
+            error += sindex + "번째행 실패\n"
+
+    #오류출력
+    #잔액계산 고려 (등록/삭제/수정 시)
 
     return HttpResponse('<script type="text/javascript">window.close(); window.opener.parent.location.reload(); window.parent.location.href="/";</script>')
 
