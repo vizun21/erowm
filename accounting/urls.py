@@ -41,6 +41,7 @@ urlpatterns = [
     url(r'^subsection/create/$', views.subsection_create, name='subsection_create'),
     url(r'^paragraph/create/$', views.paragraph_create, name='paragraph_create'),
     url(r'^item/create/$', views.item_create, name='item_create'),
+    url(r'^item/edit/(?P<pk>\d+)/$', views.item_edit, name='item_edit'),
     url(r'^subdivision/list/$', views.subdivision_list, name='subdivision_list'),
     url(r'^subdivision/create/$', views.subdivision_create, name='subdivision_create'),
     #url(r'^premonth/transfer/price/$', views.premonth_transfer_price, name='premonth_transfer_price'),
@@ -82,6 +83,7 @@ urlpatterns = [
     url(r'^popup_upload/$', views.popup_upload, name='popup_upload'),
     url(r'^upload/transaction/$', views.upload_transaction, name='upload_transaction'),
     url(r'^upload/transaction2/$', views.upload_transaction2, name='upload_transaction2'),
+    url(r'^upload/voucher/$', views.upload_voucher, name='upload_voucher'),
 
     url(r'^close/list/$', views.close_list, name='close_list'),
     url(r'^regist/close/$', views.regist_close, name='regist_close'),

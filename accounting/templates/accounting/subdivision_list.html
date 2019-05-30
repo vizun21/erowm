@@ -22,7 +22,7 @@
 				
 				<tbody>
 					{% for subdivision in subdivisions %}
-					<tr rowspan={{ subdivision.count }}>
+					<tr>
 						<td class="text-center"><input type="checkbox" name="check_list[]" value="{{ subdivision.code }}"></td>
 						<td class="text-center">{{ subdivision.item }}</td>
 						<td class="text-center">{{ subdivision.code }}</td>
