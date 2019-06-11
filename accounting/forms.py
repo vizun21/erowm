@@ -6,7 +6,7 @@ from django.core.exceptions import NON_FIELD_ERRORS
 
 from .models import Profile, Owner, Business, Sales, Agency, Account
 from .models import Subsection, Paragraph, Item, Subdivision
-from .models import TBLBANK
+from .models import TBLBANK, Transaction
 
 class SignupForm(UserCreationForm):
     email = forms.EmailField(
@@ -186,7 +186,7 @@ class BusinessForm(forms.ModelForm):
 
     class Meta:
         model = Business
-        fields = ('name', 'place_name', 'reg_number', 'owner_name', 'owner_reg_number1', 'owner_reg_number2', 'type1', 'type2', 'type3','cellphone', 'phone', 'fax', 'email', 'zip_number', 'address', 'detailed_address',)
+        fields = ('name', 'place_name', 'reg_number', 'owner_name', 'owner_reg_number1', 'owner_reg_number2', 'type1', 'type2', 'type3','cellphone', 'phone', 'fax', 'email', 'zip_number', 'address', 'detailed_address')
         labels = {
                 'name': '사업명',
                 'place_name': '사업장명',
@@ -527,3 +527,42 @@ class TblbankDirectForm(forms.ModelForm):
         self.fields['Bkdate'].widget.attrs['readonly'] = True
         self.fields['Bkoutput'].widget.attrs['style'] = 'display:none'
         self.fields['Bkoutput'].widget.attrs['value'] = 0
+
+class TransactionEditForm(forms.ModelForm):
+    class Meta:
+        model = Transaction
+        fields = ('Bkdate', 'item', 'Bkjukyo', 'Bkinput', 'Bkoutput')
+        labels = {
+            'Bkdate': '거래일자',
+            'item': '계정',
+            'Bkjukyo': '적요',
+            'Bkinput': '수입',
+            'Bkoutput': '지출',
+        }
+
+    def __init__(self, *args, **kwargs):
+        super(TransactionEditForm, self).__init__(*args, **kwargs)
+        self.fields['Bkdate'].widget.attrs['readonly'] = True
+        self.fields['Bkinput'].widget.attrs['readonly'] = True
+        self.fields['Bkoutput'].widget.attrs['readonly'] = True
+        self.fields['Bkdate'].widget.attrs['style'] = "background-color:#ddd"
+        self.fields['Bkinput'].widget.attrs['style'] = "background-color:#ddd"
+        self.fields['Bkoutput'].widget.attrs['style'] = "background-color:#ddd"
+
+class AuthKeyForm(forms.ModelForm):
+    s_auth_key = forms.RegexField(
+        regex=r'^[A-Z0-9]{32}$',
+        label='인증키',
+        max_length=32,
+        error_messages = {
+            'invalid': "인증키를 다시 확인해주세요.",
+        },
+        widget=forms.TextInput(
+            attrs={
+                'size': '35',
+            }
+        )
+    )
+    class Meta:
+        model = Business
+        fields = ('s_auth_key',)

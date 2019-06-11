@@ -3,6 +3,7 @@ from . import views
 
 urlpatterns = [
     url(r'^$', views.main, name='main'),
+    url(r'^home$', views.home, name='home'),
     url(r'^business/list/$', views.business_list, name='business_list'),
     url(r'^business/create/$', views.business_create, name='business_create'),
     url(r'^business/edit/(?P<pk>\d+)/$', views.business_edit, name='business_edit'),
@@ -40,12 +41,15 @@ urlpatterns = [
     url(r'^subsection/create/$', views.subsection_create, name='subsection_create'),
     url(r'^paragraph/create/$', views.paragraph_create, name='paragraph_create'),
     url(r'^item/create/$', views.item_create, name='item_create'),
+    url(r'^item/edit/(?P<pk>\d+)/$', views.item_edit, name='item_edit'),
     url(r'^subdivision/list/$', views.subdivision_list, name='subdivision_list'),
     url(r'^subdivision/create/$', views.subdivision_create, name='subdivision_create'),
     #url(r'^premonth/transfer/price/$', views.premonth_transfer_price, name='premonth_transfer_price'),
     url(r'^regist_transaction/$', views.regist_transaction, name='regist_transaction'),
     url(r'^popup_transaction_direct/$', views.popup_transaction_direct, name='popup_transaction_direct'),
     url(r'^regist_transaction_direct/$', views.regist_transaction_direct, name='regist_transaction_direct'),
+    url(r'^popup_transaction_edit/$', views.popup_transaction_edit, name='popup_transaction_edit'),
+    url(r'^edit_transaction/$', views.edit_transaction, name='edit_transaction'),
     url(r'^other/settings/$', views.other_settings, name='other_settings'),
     url(r'^database/syn/$', views.database_syn, name='database_syn'),
     url(r'^transaction/delete/$', views.transaction_delete, name='transaction_delete'),
@@ -66,6 +70,7 @@ urlpatterns = [
     url(r'^print/(?P<budget_type>[a-z]\w+)_settlement2/$', views.print_budget_settlement2, name='print_budget_settlement2'),
     url(r'^print/transaction/$', views.print_transaction, name='print_transaction'),
     url(r'^print/general_ledger/$', views.print_general_ledger, name='print_general_ledger'),
+    url(r'^print/voucher/$', views.print_voucher2, name='print_voucher2'),
     url(r'^print/(?P<voucher_type>[a-z]\w+)_voucher/$', views.print_voucher, name='print_voucher'),
     url(r'^popup_returned_transaction/$', views.popup_returned_transaction, name='popup_returned_transaction'),
     url(r'^regist/returned_transaction$', views.regist_returned_transaction, name='regist_returned_transaction'),
@@ -78,6 +83,7 @@ urlpatterns = [
     url(r'^popup_upload/$', views.popup_upload, name='popup_upload'),
     url(r'^upload/transaction/$', views.upload_transaction, name='upload_transaction'),
     url(r'^upload/transaction2/$', views.upload_transaction2, name='upload_transaction2'),
+    url(r'^upload/voucher/$', views.upload_voucher, name='upload_voucher'),
 
     url(r'^close/list/$', views.close_list, name='close_list'),
     url(r'^regist/close/$', views.regist_close, name='regist_close'),
@@ -86,6 +92,9 @@ urlpatterns = [
     url(r'^id_check/$', views.id_check, name='id_check'),
     url(r'^account_check/$', views.account_check, name='account_check'),
     url(r'^change_item_option/$', views.change_item_option, name='change_item_option'),
+
+    url(r'^authkey_list/$', views.authkey_list, name='authkey_list'),
+    url(r'^authkey_edit/$', views.authkey_edit, name='authkey_edit'),
     
     url(r'^set_proofnum/$', views.set_proofnum, name='set_proofnum'),
 

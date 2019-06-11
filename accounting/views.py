@@ -8,7 +8,7 @@ from .models import Subsection, Paragraph, Item, Subdivision
 from .models import Transaction, TBLBANK, Budget, Deadline
 from .forms import SignupForm, OwnerForm, BusinessForm, UserForm, SalesForm, AgencyForm, EditOwnerForm, AccountForm
 from .forms import SubsectionForm, ParagraphForm, ItemForm, SubdivisionForm
-from .forms import TblbankDirectForm
+from .forms import TblbankDirectForm, TransactionEditForm
 from .crypto import AESCipher
 
 from django.contrib.auth import authenticate, login
@@ -18,7 +18,8 @@ from django.utils import timezone
 from django.utils.dateformat import DateFormat
 from dateutil.relativedelta import relativedelta
 
-from django.db.models import Sum, Count, Case, When
+import math
+from django.db.models import Sum, Count, Case, When, Q, Min
 from django.db.models.functions import Coalesce
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
@@ -44,7 +45,6 @@ def main(request):
             return redirect("user_transform")
         else:
             return redirect("business_list")
-    return render(request, 'accounting/main.html')
 
 def id_check(request):
     id_check = False
@@ -132,10 +132,145 @@ def business_edit(request, pk):
     return render(request, 'accounting/business_edit.html', {'form': form, 'business': business})
 
 @login_required(login_url='/')
+def home(request):
+    business = get_object_or_404(Business, pk=request.session['business'])
+    today = datetime.datetime.now()
+    year = request.GET.get('year', today.strftime("%Y"))
+    month = request.GET.get('month', today.strftime("%m"))
+    inout_type = request.GET.get('type', 'input')
+
+    if int(month) < 3:
+        ac_year = (today - relativedelta(years=1)).strftime("%Y")
+    else:
+        ac_year = year
+
+    start_date = datetime.datetime.strptime(year+"-"+month+"-01", "%Y-%m-%d")
+    end_date = start_date + relativedelta(months=1)
+    
+    #--마감자료
+    try:
+        deadline = Deadline.objects.get(business=business, year=year, month=month)
+    except:
+        deadline = None
+    #--마감자료 END
+
+    #--기타필요경비, 특별활동비, 장/단기 차입금 예산 결산 자료
+    data_list2 = Item.objects.filter(
+        paragraph__subsection__institution = business.type3
+    ).filter(Q(context__contains="기타 필요경비")|Q(context__contains="특별활동비")|Q(context__contains="차입금")
+    ).annotate(
+        budget_amount=Coalesce(Sum(Case(
+            When(budget__business = business, then=Case(
+                When(budget__year = ac_year, then='budget__price'))))), 0)
+    ).exclude(code=0).order_by(
+        'paragraph__subsection__type',
+        'paragraph__subsection__code',
+        'paragraph__code',
+        'code'
+    )
+
+    data_list = Item.objects.filter(
+        paragraph__subsection__institution = business.type3
+    ).filter(Q(context__contains="기타 필요경비")|Q(context__contains="특별활동비")|Q(context__contains="차입금")
+    ).annotate(
+        settlement_amount=Coalesce(Sum(Case(
+            When(transaction__business = business, then=Case(
+                When(transaction__Bkdate__gte = start_date, then=Case(
+                    When(transaction__Bkdate__lt = end_date, then=Case(
+                        When(
+                            transaction__Bkoutput=0,
+                            then='transaction__Bkinput'
+                        ),
+                        default='transaction__Bkoutput')))))))), 0)
+    ).exclude(code=0).order_by(
+        'paragraph__subsection__type',
+        'paragraph__subsection__code',
+        'paragraph__code',
+        'code'
+    )
+
+    for idx, data in enumerate(data_list):
+        data.budget_amount = math.ceil(data_list2[idx].budget_amount/12)
+        try:
+            data.rate_of_change = round(data.settlement_amount/data.budget_amount, 2)
+        except:
+            data.rate_of_change = '-'
+    #--기타필요경비, 특별활동비, 장/단기 차입금 예산 결산 자료 END
+
+    #--중복거래 내역
+    duplicate_tr = Transaction.objects.filter(
+        business=business, Bkdate__gte=start_date, Bkdate__lt=end_date
+    ).values(
+        'Bkdate', 'item__paragraph__subsection__type', 'item__context', 'item',
+        'Bkjukyo', 'Bkinput', 'Bkoutput'
+    ).annotate(price=Case(When(Bkinput__gt=0, then='Bkinput'), default='Bkoutput')
+    ).annotate(count=Count('Bkdate')).filter(count__gte=2)
+    #--중복거래 내역 END
+    
+    #--세입, 세출에 따른 목별 예산 결산 자료
+    if inout_type == "input":
+        filter_type = "수입"
+        budget_type = "revenue"
+    else:
+        filter_type = "지출"
+        budget_type = "expenditure"
+
+    try:
+        filter_budget_type = Budget.objects.filter(business=business, year=ac_year, type__icontains=budget_type).order_by('type').last().type
+    except:
+        filter_budget_type = budget_type
+
+    budget_list = Item.objects.filter(
+        paragraph__subsection__institution = business.type3, paragraph__subsection__type=filter_type
+    ).annotate(
+        budget_amount=Coalesce(Sum(Case(
+            When(budget__business = business, then=Case(
+                When(budget__year = ac_year, then=Case(When(
+                    budget__type = filter_budget_type, then='budget__price'))))))), 0)
+    ).exclude(code=0).order_by(
+        'paragraph__subsection__type',
+        'paragraph__subsection__code',
+        'paragraph__code',
+        'code'
+    )
+
+    item_list = Item.objects.filter(
+        paragraph__subsection__institution = business.type3, paragraph__subsection__type=filter_type
+    ).annotate(
+        settlement_amount=Coalesce(Sum(Case(
+            When(transaction__business = business, then=Case(
+                When(transaction__Bkdate__gte = start_date, then=Case(
+                    When(transaction__Bkdate__lt = end_date, then=Case(
+                        When(
+                            transaction__Bkoutput=0,
+                            then='transaction__Bkinput'
+                        ),
+                        default='transaction__Bkoutput')))))))), 0)
+    ).exclude(code=0).order_by(
+        'paragraph__subsection__type',
+        'paragraph__subsection__code',
+        'paragraph__code',
+        'code'
+    )
+
+    for idx, item in enumerate(item_list):
+        item.budget_amount = math.ceil(budget_list[idx].budget_amount/12)
+        try:
+            item.rate_of_change = round(item.settlement_amount/item.budget_amount, 2)
+        except:
+            item.rate_of_change = '-'
+    #--세입, 세출에 따른 목별 예산 결산 자료 END
+
+    return render(request, 'accounting/home.html', {
+        'business': business, 'y_range': range(today.year,1999,-1), 'm_range': range(1,13),
+        'year': int(year), 'month': int(month), 'item_list': item_list, 'type': inout_type,
+        'deadline': deadline, 'data_list': data_list, 'duplicate_tr': duplicate_tr })
+
+@login_required(login_url='/')
 def transform_business(request, pk):
     business = get_object_or_404(Business, pk=pk)
     request.session['business'] = business.pk
-    return redirect('business_info')
+    return redirect('home')
 
 @login_required(login_url='/')
 def retransform_business(request):
@@ -633,7 +768,8 @@ def regist_transaction(request):
         for check in tr_check_list:
             Bkid=tr_list[int(check)]
             tblbank_tr = TBLBANK.objects.get(Bkid=Bkid)
-            Bkdivision = Transaction.objects.filter(Bkid=Bkid).filter(Bkdivision__gt=0).count() + 1
+            Bkdivision = 1
+            #Bkdivision = Transaction.objects.filter(Bkid=Bkid).filter(Bkdivision__gt=0).count() + 1
             Bkdate = Bkdate_list[int(check)]
             start_date = datetime.datetime.strptime(Bkdate[:8]+'01', "%Y-%m-%d")
 
@@ -817,6 +953,18 @@ def item_create(request):
             return redirect('spi_list')
     else:
         form = ItemForm()
+    return render(request, 'accounting/item_edit.html', {'form': form})
+
+@login_required(login_url='/')
+def item_edit(request, pk):
+    item = Item.objects.get(pk=pk)
+    if request.method == "POST":
+        form = ItemForm(request.POST, instance=item)
+        if form.is_valid():
+            form.save()
+            return redirect('spi_list')
+    else:
+        form = ItemForm(instance=item)
     return render(request, 'accounting/item_edit.html', {'form': form})
 
 @login_required(login_url='/')
@@ -1030,11 +1178,14 @@ def regist_division(request):
             )
 
             update_list = Transaction.objects.filter(business=business, Bkdate__gt=Bkdate, Bkdate__lt=a_month_later)
+            print(update_list)
             for update in update_list:
-                if inoutType == "수입":
+                print(Bkinout[r])
+                if inoutType == "input":
                     update.Bkjango = int(update.Bkjango) + int(Bkinout[r])
-                if inoutType == "지출":
+                if inoutType == "output":
                     update.Bkjango = int(update.Bkjango) - int(Bkinout[r])
+                print(update.Bkjango)
                 update.save()
 
             tr, created = TBLBANK.objects.get_or_create(business=business, Bkid=Bkid, Bkdivision=r, Mid=Mid, Bkacctno=tblbank_tr.Bkacctno, Bkname=tblbank_tr.Bkname, Bkdate=tblbank_tr.Bkdate)
@@ -1579,11 +1730,13 @@ def print_voucher(request, voucher_type):
         ymd_list.append(transaction.Bkdate)
     ymd_list = list(set(ymd_list))
     ymd_list.sort()
-    
 
     data_list = []
     for ymd in ymd_list:
-        item_list = Item.objects.filter(transaction__business=business, transaction__Bkdate=ymd, paragraph__subsection__type=filter_type).exclude(paragraph__subsection__code=0).distinct()
+        if voucher_type == 'revenue':
+            item_list = Item.objects.filter(transaction__business=business, transaction__Bkdate=ymd, transaction__Bkinput__gt=0, paragraph__subsection__type=filter_type).exclude(paragraph__subsection__code=0).distinct()
+        else:
+            item_list = Item.objects.filter(transaction__business=business, transaction__Bkdate=ymd, transaction__Bkoutput__gt=0, paragraph__subsection__type=filter_type).exclude(paragraph__subsection__code=0).distinct()
         for item in item_list:
             transaction = []
             if voucher_type == 'revenue':
@@ -1601,6 +1754,18 @@ def print_voucher(request, voucher_type):
             data_list.append({'date': ymd, 'item': item})
 
     return render(request,'accounting/print_voucher.html', {'settlement_management': 'active', 'master_login': request.session['master_login'], 'business': business, 'year': year, 'month': month, 'year2': year2, 'month2': month2, 'data_list': data_list, 'voucher_type': voucher_type})
+
+@login_required(login_url='/')
+def print_voucher2(request):
+    business = get_object_or_404(Business, pk=request.session['business'])
+    pk = request.GET.get('pk')
+    transaction = get_object_or_404(Transaction, id=pk, business=business)
+    if transaction.item.paragraph.subsection.type == "수입":
+        transaction.sum_ko = readNumber(str(transaction.Bkinput))
+    else:
+        transaction.sum_ko = readNumber(str(transaction.Bkoutput))
+
+    return render(request,'accounting/print_voucher2.html', {'settlement_management': 'active', 'master_login': request.session['master_login'], 'business': business, 'transaction': transaction})
 
 @login_required(login_url='/')
 def popup_returned_transaction(request):
@@ -1854,6 +2019,57 @@ def regist_transaction_direct(request):
     return HttpResponse('<script type="text/javascript">window.close(); window.opener.parent.location.reload(); window.parent.location.href="/";</script>')
 
 @login_required(login_url='/')
+def popup_transaction_edit(request):
+    pk = request.GET.get('pk')
+    business = get_object_or_404(Business, pk=request.session['business'])
+    transaction = get_object_or_404(Transaction, id=pk, business=business)
+    tblbankform = TransactionEditForm(instance=transaction)
+    tblbankform.fields['item'].queryset = Item.objects.filter(paragraph__subsection__institution = business.type3, paragraph__subsection__type=transaction.item.paragraph.subsection.type).exclude(code=0)
+    inoutType = transaction.item.paragraph.subsection.type
+    if inoutType == "수입":
+        tblbankform.fields['Bkoutput'].widget.attrs['style'] = 'display:none'
+        tblbankform.fields['Bkoutput'].widget.attrs['value'] = 0
+    else:
+        tblbankform.fields['Bkinput'].widget.attrs['style'] = 'display:none'
+        tblbankform.fields['Bkinput'].widget.attrs['value'] = 0
+    return render(request,'accounting/popup_transaction_edit.html', {'transactionform': tblbankform, 'year': transaction.Bkdate.year, 'month': transaction.Bkdate.month, 'pk': pk})
+
+@login_required(login_url='/')
+def edit_transaction(request):
+    business = get_object_or_404(Business, pk=request.session['business'])
+    today = datetime.datetime.now()
+    inout_type = request.POST.get('inout')
+    remark = request.POST.get('remark')
+    pk = request.POST.get('pk', '')
+    transaction = get_object_or_404(Transaction, pk=pk)
+    transactionform = TransactionEditForm(request.POST, instance=transaction)
+
+    try:
+        close = Deadline.objects.get(business=business,year=Bkdate[:4],month=Bkdate[5:7])
+        if close.regdatetime:
+            return HttpResponse("<script>alert('해당월은 마감완료되었습니다.');history.back();</script>")
+    except:
+        pass
+    
+    #금액수정불가, 관항목만 수정가능
+    if transactionform.is_valid():
+        tr = transactionform.save(commit=False)
+        if tr.Bkinput == None:
+            tr.Bkinput = 0
+        if tr.Bkoutput == None:
+            tr.Bkoutput = 0
+        tr.regdatetime = today
+        tr.save()
+        
+        #TBLBANK테이블 동일한 항목 update
+        update_tr = TBLBANK.objects.get(business=business, Bkid=tr.Bkid, Bkdivision=tr.Bkdivision)
+        update_tr.item = tr.item
+        update_tr.sub_Bkjukyo = tr.Bkjukyo
+        update_tr.save()
+
+    return HttpResponse('<script type="text/javascript">window.close(); window.opener.parent.location.reload(); window.parent.location.href="/";</script>')
+
+@login_required(login_url='/')
 def print_returned_voucher(request, voucher_type):
     business = get_object_or_404(Business, pk=request.session['business'])
     year = int(request.POST.get('year'))
@@ -1889,7 +2105,10 @@ def print_returned_voucher(request, voucher_type):
 
     data_list = []
     for ymd in ymd_list:
-        item_list = Item.objects.filter(transaction__business=business, transaction__Bkdate=ymd, paragraph__subsection__type=filter_type).exclude(paragraph__subsection__code=0).distinct()
+        if voucher_type == 'revenue':
+            item_list = Item.objects.filter(transaction__business=business, transaction__Bkdate=ymd, transaction__Bkinput__lt=0, paragraph__subsection__type=filter_type).exclude(paragraph__subsection__code=0).distinct()
+        else:
+            item_list = Item.objects.filter(transaction__business=business, transaction__Bkdate=ymd, transaction__Bkoutput__lt=0, paragraph__subsection__type=filter_type).exclude(paragraph__subsection__code=0).distinct()
         for item in item_list:
             if voucher_type == 'revenue':
                 transaction = Transaction.objects.filter(business=business, Bkdate=ymd, item=item, Bkinput__lt=0)
@@ -2194,7 +2413,7 @@ def close_list(request):
 
     for ym in ym_list:
         try:
-            get_deadline = Deadline.objects.get(year=ym['Bkdate__year'], month=ym['Bkdate__month'])
+            get_deadline = Deadline.objects.get(business=business, year=ym['Bkdate__year'], month=ym['Bkdate__month'])
             if get_deadline.regdatetime:
                 ym['close'] = 1
         except Deadline.DoesNotExist:
@@ -2257,6 +2476,24 @@ def undo_close(request):
         response['Location'] += '?year='+year   #회기년도
     return response
 
+@login_required(login_url='/')
+def authkey_list(request):
+    business = get_object_or_404(Business, pk=request.session['business'])
+    return render(request, 'accounting/authkey_list.html', {'business_management': 'active', 'authkey_page': 'active', 'business': business})
+
+@login_required(login_url='/')
+def authkey_edit(request):
+    from .forms import AuthKeyForm
+    business = get_object_or_404(Business, pk=request.session['business'])
+    if request.method == "POST":
+        form = AuthKeyForm(request.POST, instance=business)
+        if form.is_valid():
+            form.save()
+            return redirect('authkey_list')
+    else:
+        form = AuthKeyForm()
+    return render(request, 'accounting/authkey_edit.html', {'business_management': 'active', 'authkey_page': 'active', 'business': business, 'form': form})
+
 #--------------파일다운로드-------------
 from .models import UploadFile
 
@@ -2285,24 +2522,32 @@ def upload_transaction(request):
     if upfile == None:
         return HttpResponse("<script>alert('파일을 선택해주세요.');history.back();</script>")
     upfile.name = str(ymd)+'_'+business.name+'_거래내역.xlsx'
-    UploadFile.objects.create(title=str(ymd)+'_'+business.name+'_거래내역', file=upfile, user=request.user)
+    created_file = UploadFile.objects.create(title=str(ymd)+'_'+business.name+'_거래내역', file=upfile, user=request.user)
 
     wb = load_workbook(filename='./media/'+upfile.name)
     sheet = wb.worksheets[0]
     try:
-        Bkacct = Account.objects.get(account_number=sheet['B1'].value)
+        Bkacct = Account.objects.get(business=business, account_number=sheet['B1'].value)
     except:
         return HttpResponse("<script>alert('등록되지 않은 계좌입니다. 엑셀파일의 계좌번호를 확인해주세요.');history.back();</script>")
 
     num = TBLBANK.objects.all().order_by('-Bkid').first().Bkid + 1
     for index in range(5, sheet.max_row + 1):
         if sheet['A'+str(index)] and sheet['B'+str(index)] and sheet['E'+str(index)] and (sheet['C'+str(index)] or sheet['D'+str(index)]):
-            Bkinput = 0
-            Bkoutput = 0
-            if sheet['C'+str(index)].value and sheet['C'+str(index)].value > 0:
-                Bkinput = sheet['C'+str(index)].value
-            elif sheet['D'+str(index)].value and sheet['D'+str(index)].value > 0:
-                Bkoutput = sheet['D'+str(index)].value
+            if sheet['C'+str(index)].value and not sheet['D'+str(index)].value:
+                if sheet['C'+str(index)].value > 0:
+                    Bkinput = sheet['C'+str(index)].value
+                    Bkoutput = 0
+                elif sheet['C'+str(index)].value < 0:
+                    Bkinput = 0
+                    Bkoutput = sheet['C'+str(index)].value * -1
+            elif sheet['D'+str(index)].value and not sheet['C'+str(index)].value:
+                if sheet['D'+str(index)].value > 0:
+                    Bkinput = 0
+                    Bkoutput = sheet['D'+str(index)].value
+                elif sheet['D'+str(index)].value < 0:
+                    Bkinput = sheet['D'+str(index)].value * -1
+                    Bkoutput = 0
 
             datetimecell = sheet['A'+str(index)].value
             if type(datetimecell) == datetime.datetime:
@@ -2348,7 +2593,7 @@ def upload_transaction2(request):
     wb = load_workbook(filename='./media/'+upfile.name)
     sheet = wb.worksheets[0]
     try:
-        Bkacct = Account.objects.get(account_number=sheet['B1'].value)
+        Bkacct = Account.objects.get(business=business, account_number=sheet['B1'].value)
     except:
         created_file.delete()
         return HttpResponse("<script>alert('등록되지 않은 계좌입니다. 엑셀파일의 계좌번호를 확인해주세요.');history.back();</script>")
@@ -2356,12 +2601,20 @@ def upload_transaction2(request):
     num = TBLBANK.objects.all().order_by('-Bkid').first().Bkid + 1
     for index in range(5, sheet.max_row + 1):
         if sheet['A'+str(index)] and sheet['B'+str(index)] and sheet['C'+str(index)] and sheet['F'+str(index)] and (sheet['D'+str(index)] or sheet['E'+str(index)]):
-            Bkinput = 0
-            Bkoutput = 0
-            if sheet['D'+str(index)].value and sheet['D'+str(index)].value > 0:
-                Bkinput = sheet['D'+str(index)].value
-            elif sheet['E'+str(index)].value and sheet['E'+str(index)].value > 0:
-                Bkoutput = sheet['E'+str(index)].value
+            if sheet['D'+str(index)].value and not sheet['E'+str(index)].value:
+                if sheet['D'+str(index)].value > 0:
+                    Bkinput = sheet['D'+str(index)].value
+                    Bkoutput = 0
+                elif sheet['D'+str(index)].value < 0:
+                    Bkinput = 0
+                    Bkoutput = sheet['D'+str(index)].value * -1
+            elif sheet['E'+str(index)].value and not sheet['D'+str(index)].value:
+                if sheet['E'+str(index)].value > 0:
+                    Bkinput = 0
+                    Bkoutput = sheet['E'+str(index)].value
+                elif sheet['E'+str(index)].value < 0:
+                    Bkinput = sheet['E'+str(index)].value * -1
+                    Bkoutput = 0
 
             datecell = sheet['A'+str(index)].value
             if type(datecell) == datetime.datetime:
@@ -2406,6 +2659,85 @@ def upload_transaction2(request):
         num += 1
 
     return HttpResponse('<script type="text/javascript">window.close(); window.opener.parent.location.reload(); window.parent.location.href="/";</script>')
+
+
+from django.db import transaction
+
+@login_required(login_url='/')
+def upload_voucher(request):
+    business = get_object_or_404(Business, pk=request.session['business'])
+    today = datetime.datetime.now()
+    ymd = DateFormat(today).format("ymdHis")
+    upfile = request.FILES.get('file')
+    upload_type = request.POST.get('type')
+
+    if upfile == None:
+        return HttpResponse("<script>alert('파일을 선택해주세요.');history.back();</script>")
+    upfile.name = str(ymd)+'_'+business.name+'_현금출납장.xlsx'
+    created_file = UploadFile.objects.create(title=str(ymd)+'_'+business.name+'_현금출납장', file=upfile, user=request.user)
+
+    wb = load_workbook(filename='./media/'+upfile.name)
+    sheet = wb.worksheets[0]
+
+    num = TBLBANK.objects.all().order_by('-Bkid').first().Bkid + 1
+    error = ""
+    for index in range(2, sheet.max_row + 1):
+        sindex = str(index)
+        try:
+            if sheet['E'+sindex].value and not sheet['F'+sindex].value:
+                Bkinput = sheet['E'+sindex].value
+                Bkoutput = 0
+            elif sheet['F'+sindex].value and not sheet['E'+sindex].value:
+                Bkinput = 0
+                Bkoutput = sheet['F'+sindex].value
+
+            datetimecell = str(sheet['A'+sindex].value)
+            Bkdate = datetime.datetime.strptime(datetimecell, '%Y%m%d')
+
+            with transaction.atomic():
+                TBLBANK.objects.create(
+                    Bkid = num,
+                    Bkdivision = 1,
+                    Mid = request.user.username,
+                    Bkacctno = None,
+                    Bkname = None,
+                    Bkdate = Bkdate,
+                    Bkjukyo = sheet['B'+sindex].value,
+                    Bkinput = Bkinput,
+                    Bkoutput = Bkoutput,
+                    Bkjango = sheet['G'+sindex].value,
+                    business = business,
+                    direct = True
+                )
+
+                item = Item.objects.get(paragraph__subsection__institution=business.type3, context=sheet['C'+sindex].value.replace(" ", ""))
+
+                Transaction.objects.create(
+                    Bkid = num,
+                    Bkdivision = 1,
+                    Mid = request.user.username,
+                    Bkacctno = None,
+                    Bkname = None,
+                    Bkdate = Bkdate,
+                    Bkjukyo = sheet['B'+sindex].value,
+                    Bkinput = Bkinput,
+                    Bkoutput = Bkoutput,
+                    Bkjango = sheet['G'+sindex].value,
+                    business = business,
+                    regdatetime = today,
+                    item = item
+                )
+            num += 1
+        except Exception as e:
+            print (e)
+            error += sindex + ","
+
+    #잔액계산 고려 (등록/삭제/수정 시)
+    if error != "":
+        error = error[:-1] + "번째행 업로드 실패"
+        return HttpResponse("<script>alert('"+error+"');window.close(); window.opener.parent.location.reload(); window.parent.location.href='/';</script>")
+    else:
+        return HttpResponse('<script type="text/javascript">window.close(); window.opener.parent.location.reload(); window.parent.location.href="/";</script>')
 
 @login_required(login_url='/')
 def test(request):

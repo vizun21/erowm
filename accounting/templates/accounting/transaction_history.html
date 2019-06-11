@@ -36,6 +36,7 @@
 								<a href="#" class="btn btn-primary btn-sm py-0" id="btn_returned_transaction">반납결의서</a>
 								<a href="#" class="btn btn-primary btn-sm py-0" onclick="window.open('{% url "popup_upload" %}?type=transaction', '파일업로드','width=500, height=200');">거래내역 엑셀 업로드</a>
 								<a href="#" class="btn btn-primary btn-sm py-0" onclick="window.open('{% url "popup_upload" %}?type=transaction2', '파일업로드','width=500, height=200');">거래내역 엑셀 업로드(날짜시간셀구분)</a>
+								<a href="#" class="btn btn-primary btn-sm py-0" onclick="window.open('{% url "popup_upload" %}?type=voucher', '파일업로드','width=500, height=200');">현금출납장 업로드</a>
 							</th>
 						</tr>
 						<tr>
@@ -212,7 +213,13 @@
 							</td>
 							<td class="text-right">{{ dt.Bkinput|default:''|intcomma }}</td>
 							<td class="text-right">{{ dt.Bkoutput|default:''|intcomma }}</td>
-							<td class="text-right">{{ dt.Bkjango|default:'0'|intcomma }}</td>
+							<td class="text-right">
+								{% if dt.Bkdivision == 1 %}
+								{{ dt.Bkjango|default:'0'|intcomma }}
+								{% else %}
+								{{ dt.Bkjango|default:''|intcomma }}
+								{% endif %}
+							</td>
 							<td>
 								{% if not dt.regdatetime %}
 								<a href="#" onclick="window.open('{% url "popup_transaction_division" Bkid=dt.Bkid %}?month={{ month }}', '분할등록','width=1000, height=300, scrollbars=1');" class="btn btn-primary btn-sm py-0">분할</a>
@@ -291,12 +298,12 @@
 					<thead class="thead-light text-center">
 						<tr>
 							<th colspan=3>거래리스트</th>
-							<th colspan=10 style="background:None;border-top:1px solid #ffffff;border-right:1px solid #ffffff" class="text-left">
+							<th colspan=11 style="background:None;border-top:1px solid #ffffff;border-right:1px solid #ffffff" class="text-left">
 								<a href="#" onclick="window.open('{% url "popup_transaction_direct" %}?year={{ year }}&month={{ month }}', '거래직접등록','width=1000, height=300');" class="btn btn-primary btn-sm py-0">직접등록</a>
 							</th>
 						</tr>
 						<tr>
-							<td colspan=13 style="border-top:0px;">
+							<td colspan="14" style="border-top:0px;">
 								전월이월금 : {{ premonth_transfer_price }} | 수입계 : {{ total_input }} | 지출계 : {{ total_output }} | 잔액 : {{ jango }}
 							</td>
 						</tr>
@@ -314,6 +321,7 @@
 							<th>출금</th>
 							<th>잔액</th>
 							<th>수정</th>
+							<th>출력</th>
 						</tr>
 					</thead>
 					
@@ -339,7 +347,14 @@
 							<td class="text-right">{{ dt.Bkinput|default:''|intcomma }}</td>
 							<td class="text-right">{{ dt.Bkoutput|default:''|intcomma }}</td>
 							<td class="text-right">{{ dt.Bkjango|default:'0'|intcomma }}</td>
-							<td></td>
+							<td>
+								<a href="#" onclick="window.open('{% url "popup_transaction_edit" %}?pk={{dt.id}}', '거래수정','width=1000, height=300, scrollbars=1');" class="btn btn-primary btn-sm py-0">수정</a>
+							</td>
+							<td>
+								{% if dt.item.code != 0 %}
+								<a href="#" onclick="window.open('{% url "print_voucher2" %}?pk={{dt.id}}', '출력','width=800, height=500, scrollbars=1');" class="btn btn-primary btn-sm py-0">출력</a>
+								{% endif %}
+							</td>
 						</tr>
 						{% endfor %}
 					</tbody>

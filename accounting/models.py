@@ -151,6 +151,7 @@ class Business(models.Model):
     zip_number = models.CharField(max_length=5)
     address = models.CharField(max_length=45)
     detailed_address = models.CharField(max_length=20)
+    s_auth_key = models.CharField(max_length=32, null=True, blank=True)
 
     def __str__(self):
         return self.name
