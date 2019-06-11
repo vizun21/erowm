@@ -17,10 +17,11 @@ import requests
 def monthly_report(request):
     business = get_object_or_404(Business, pk=request.session['business'])
     today = datetime.datetime.now()
-    date = today - relativedelta(months=1)
-    selected_year = request.GET.get('year', date.strftime("%Y"))
-    this_y = date.strftime("%Y")
-    this_m = date.strftime("%m")
+    #5월 회계전송시 MON은 당월(6월)로 설정. 회계데이터는 5월로 설정
+    report_date = today - relativedelta(months=1)
+    report_y = report_date.strftime("%Y")
+    report_m = report_date.strftime("%m")
+    selected_year = request.GET.get('year', report_date.strftime("%Y"))
     operation = "acRptMonthSum"
 
     if request.method == "GET":
@@ -45,7 +46,7 @@ def monthly_report(request):
                 Sum(Case(
                     When(transaction__business = business, then=Case(
                         When(transaction__Bkdate__year = selected_year, then=Case(
-                            When(transaction__Bkdate__month = this_m, then=Case(
+                            When(transaction__Bkdate__month = report_m, then=Case(
                                 When(
                                     transaction__Bkoutput=0,
                                     then='transaction__Bkinput'
@@ -54,7 +55,7 @@ def monthly_report(request):
             count=Count(Case(
                 When(transaction__business = business, then=Case(
                     When(transaction__Bkdate__year = selected_year, then=Case(
-                        When(transaction__Bkdate__month = this_m, then='id')))))))
+                        When(transaction__Bkdate__month = report_m, then='id')))))))
         ).exclude(code=0).exclude(total_sum=0).exclude(count=0).order_by(
             'paragraph__subsection__type',
             'paragraph__subsection__code',
@@ -64,7 +65,7 @@ def monthly_report(request):
         #--END SR
 
         body =  "<S_AUTH_KEY>"+business.s_auth_key+"</S_AUTH_KEY>\n" + \
-                "<MON>"+date.strftime("%Y")+this_m+"</MON>\n"
+                "<MON>"+today.strftime("%Y%m")+"</MON>\n"
         for item in item_list:
             GB = "1" if item.paragraph.subsection.type=="수입" else "2"
             CD = str(item.paragraph.subsection.code)+str(item.paragraph.code)+str(item.code)
@@ -74,13 +75,13 @@ def monthly_report(request):
             body += "   <AMT>"+str(item.total_sum)+"</AMT>\n"
             body += "   <CNT>"+str(item.count)+"</CNT>\n"
             body += "</SR>\n"
-        response = request_childcare(business, operation, selected_year, this_m, body)
+        response = request_childcare(business, operation, selected_year, report_m, body)
         return response
 
     return render(request, 'childcare/monthly_report.html', {
         'accounting_report': 'active', 'monthly_report': 'active','business': business,
-        'ym_range': ym_range, 'y_range': range(int(this_y), 1999, -1),
-        'this_y': this_y, 'this_m': this_m, 'selected_year': int(selected_year) })
+        'ym_range': ym_range, 'y_range': range(int(report_y), 1999, -1),
+        'this_y': report_y, 'this_m': report_m, 'selected_year': int(selected_year) })
 
 @login_required(login_url='/')
 def budget_report(request):
@@ -223,8 +224,8 @@ def settlement_report(request):
 
 
 def request_childcare(business, operation, year, gubun, body):
-    #url = "https://api.childcare.go.kr/route/soap/acntRpt/"+operation+".ws/"+operation+".ws?wsdl"
-    url = "https://stgapi.childcare.go.kr/route/soap/acntRpt/"+operation+".ws/"+operation+".ws?wsdl"
+    url = "https://api.childcare.go.kr/route/soap/acntRpt/"+operation+".ws/"+operation+".ws?wsdl"
+    #url = "https://stgapi.childcare.go.kr/route/soap/acntRpt/"+operation+".ws/"+operation+".ws?wsdl"
     headers = {'content-type': 'application/soap+xml'}
     preXml = \
         '<?xml version="1.0"?>\n' + \
@@ -234,6 +235,7 @@ def request_childcare(business, operation, year, gubun, body):
         '       <xxx:'+operation+'>\n' + \
         '           <Request>\n' + \
         '               <C_AUTH_KEY>A56AE60160DB4FE98E8B445F18558AD2</C_AUTH_KEY>\n'
+        #'               <C_AUTH_KEY>550BFC50326944F5B18E8AAF8617AB0B</C_AUTH_KEY>\n'
     tailXml = \
         '           </Request>\n' + \
         '       </xxx:'+operation+'>\n' + \
@@ -242,20 +244,24 @@ def request_childcare(business, operation, year, gubun, body):
 
     reqMsg = preXml+body+tailXml
     print(reqMsg)
-    print("============post===========")
+    #print("============post===========")
     resMsg = requests.post(url, data=reqMsg.encode('utf-8'), headers=headers, verify=False)
-    print("============end==========")
-    print(resMsg.content)
+    #print("============end==========")
+    #print(resMsg.content)
     content = makeSimpleXml(resMsg.content.decode('utf-8'))
 
     record, created = Record.objects.get_or_create(business=business, operation=operation, year=year, gubun=gubun, defaults={'data': "", 'result_code': -1, 'result_msg': ""})
-    record.data = reqMsg
-    print(resMsg.status_code)
-    record.result_code = content[0]
-    record.result_msg = content[1]
-    record.regdatetime = datetime.datetime.now()
-    record.save()
+    print(created)
+    print(record.result_code)
+    if not created and content[0] == "000" or created:
+        record.data = reqMsg
+        #print(resMsg.status_code)
+        record.result_code = content[0]
+        record.result_msg = content[1]
+        record.regdatetime = datetime.datetime.now()
+        record.save()
 
+    #실패한경우 저장안되도록 변경 -> 기록보기 출력부분 수정필요
     redirect_url = redirect('show_record')
     redirect_url['Location'] += '?operation='+operation+'&year='+year+'&gubun='+gubun
     return redirect_url;
@@ -281,7 +287,8 @@ def show_record(request):
     record = get_object_or_404(Record, business=business, operation=operation, year=year, gubun=gubun)
     root = ET.fromstring(record.data)
     Body = root.find("{http://schemas.xmlsoap.org/soap/envelope/}Body")
-    Operation = Body.find("{https://stgapi.childcare.go.kr/route/soap/acntRpt/"+operation+".ws/"+operation+".ws?wsdl}"+operation)
+    Operation = Body.find("{https://api.childcare.go.kr/route/soap/acntRpt/"+operation+".ws/"+operation+".ws?wsdl}"+operation)
+    #Operation = Body.find("{https://stgapi.childcare.go.kr/route/soap/acntRpt/"+operation+".ws/"+operation+".ws?wsdl}"+operation)
     Request = Operation.find("Request")
     r_list = Request.findall(roofName)
 
