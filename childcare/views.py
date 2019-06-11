@@ -240,11 +240,14 @@ def request_childcare(business, operation, year, gubun, body):
         '</soap:Envelope>\n'
 
     reqMsg = preXml+body+tailXml
+    #print(reqMsg)
     resMsg = requests.post(url, data=reqMsg.encode('utf-8'), headers=headers, verify=False)
     content = makeSimpleXml(resMsg.content.decode('utf-8'))
-
+    #print(resMsg.content)
     record, created = Record.objects.get_or_create(business=business, operation=operation, year=year, gubun=gubun, defaults={'data': "", 'result_code': -1, 'result_msg': ""})
     record.data = reqMsg
+    #print(content[0])
+    #print(content[1])
     record.result_code = content[0]
     record.result_msg = content[1]
     record.regdatetime = datetime.datetime.now()
