@@ -243,14 +243,17 @@ def request_childcare(business, operation, year, gubun, body):
         '</soap:Envelope>\n'
 
     reqMsg = preXml+body+tailXml
-    print(reqMsg)
+
+    #print(reqMsg)
     #print("============post===========")
+
     resMsg = requests.post(url, data=reqMsg.encode('utf-8'), headers=headers, verify=False)
     #print("============end==========")
     #print(resMsg.content)
     content = makeSimpleXml(resMsg.content.decode('utf-8'))
-
+    #print(resMsg.content)
     record, created = Record.objects.get_or_create(business=business, operation=operation, year=year, gubun=gubun, defaults={'data': "", 'result_code': -1, 'result_msg': ""})
+    
     print(created)
     print(record.result_code)
     if not created and content[0] == "000" or created:
@@ -260,6 +263,7 @@ def request_childcare(business, operation, year, gubun, body):
         record.result_msg = content[1]
         record.regdatetime = datetime.datetime.now()
         record.save()
+
 
     #실패한경우 저장안되도록 변경 -> 기록보기 출력부분 수정필요
     redirect_url = redirect('show_record')
