@@ -39,7 +39,9 @@ urlpatterns = [
 
     url(r'^spi/list/$', views.spi_list, name='spi_list'),
     url(r'^subsection/create/$', views.subsection_create, name='subsection_create'),
+    url(r'^subsection/edit/(?P<pk>\d+)/$', views.subsection_edit, name='subsection_edit'),
     url(r'^paragraph/create/$', views.paragraph_create, name='paragraph_create'),
+    url(r'^paragraph/edit/(?P<pk>\d+)/$', views.paragraph_edit, name='paragraph_edit'),
     url(r'^item/create/$', views.item_create, name='item_create'),
     url(r'^item/edit/(?P<pk>\d+)/$', views.item_edit, name='item_edit'),
     url(r'^subdivision/list/$', views.subdivision_list, name='subdivision_list'),

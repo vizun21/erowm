@@ -6,6 +6,7 @@ from django.contrib.auth.models import User
 from .models import Owner, Business, Profile, Sales, Agency, Account
 from .models import Subsection, Paragraph, Item, Subdivision
 from .models import Transaction, TBLBANK, Budget, Deadline
+from .models import Business_type
 from .forms import SignupForm, OwnerForm, BusinessForm, UserForm, SalesForm, AgencyForm, EditOwnerForm, AccountForm
 from .forms import SubsectionForm, ParagraphForm, ItemForm, SubdivisionForm
 from .forms import TblbankDirectForm, TransactionEditForm
@@ -917,10 +918,18 @@ def transaction_delete(request):
 
 @login_required(login_url='/')
 def spi_list(request):
-    subsection_list = Subsection.objects.all().annotate(count=Count('paragraph__item')).exclude(count=0).order_by('institution','type','code')
-    paragraph_list = Paragraph.objects.all().annotate(count=Count('item')).exclude(count=0).order_by('code')
-    item_list = Item.objects.all().order_by('code')
-    return render(request, 'accounting/spi_list.html', {'setting_page': "active", 'spi_list_page': "active", 'subsection_list': subsection_list, 'paragraph_list': paragraph_list, 'item_list': item_list})
+    institution_name = request.GET.get('institution_name', '어린이집')
+    institution_list = Business_type.objects.all()
+
+    subsection_list = Subsection.objects.filter(institution=institution_name).annotate(count=Count('paragraph__item')).exclude(count=0).order_by('institution','type','code')
+    #paragraph_list = Paragraph.objects.all().annotate(count=Count('item')).exclude(count=0).order_by('code')
+    #item_list = Item.objects.all().order_by('code')
+    paragraph_list = Paragraph.objects.filter(subsection__institution=institution_name).annotate(count=Count('item')).exclude(count=0).order_by('code')
+    item_list = Item.objects.filter(paragraph__subsection__institution=institution_name).order_by('code')
+    return render(request, 'accounting/spi_list.html', {
+        'setting_page': "active", 'spi_list_page': "active",
+        'subsection_list': subsection_list, 'paragraph_list': paragraph_list,
+        'item_list': item_list, 'institution_list': institution_list})
 
 @login_required(login_url='/')
 def subsection_create(request):
@@ -934,6 +943,18 @@ def subsection_create(request):
     return render(request, 'accounting/subsection_edit.html', {'form': form})
 
 @login_required(login_url='/')
+def subsection_edit(request, pk):
+    subsection = Subsection.objects.get(pk=pk)
+    if request.method == "POST":
+        form = SubsectionForm(request.POST, instance=subsection)
+        if form.is_valid():
+            form.save()
+            return redirect('spi_list')
+    else:
+        form = SubsectionForm(instance=subsection)
+    return render(request, 'accounting/subsection_edit.html', {'form': form})
+
+@login_required(login_url='/')
 def paragraph_create(request):
     if request.method == "POST":
         form = ParagraphForm(request.POST)
@@ -942,6 +963,18 @@ def paragraph_create(request):
             return redirect('spi_list')
     else:
         form = ParagraphForm()
+    return render(request, 'accounting/paragraph_edit.html', {'form': form})
+
+@login_required(login_url='/')
+def paragraph_edit(request, pk):
+    paragraph = Paragraph.objects.get(pk=pk)
+    if request.method == "POST":
+        form = ParagraphForm(request.POST, instance=paragaph)
+        if form.is_valid():
+            form.save()
+            return redirect('spi_list')
+    else:
+        form = ParagraphForm(instance=paragraph)
     return render(request, 'accounting/paragraph_edit.html', {'form': form})
 
 @login_required(login_url='/')
