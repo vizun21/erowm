@@ -8,8 +8,17 @@
 <h1 class="mb-3">관항목관리</h1>
 
 <div class="row mb-4">
+	<div class="col-md-12">
+		<ul class="nav nav-tabs">
+			{% for institution in institution_list %}
+			<li class="nav-item">
+				<a class="nav-link active" href="?institution_name={{ institution }}">{{ institution }}</a>
+			</li>
+			{% endfor %}
+		</ul>
+	</div>
 	<div class="col-md-12 table-responsive">
-		<table class="table table-bordered table-hover table-sm">
+		<table class="table table-bordered table-sm">
 			<thead class="thead-light text-center text-nowrap">
 				<tr>
 					<th><input type="checkbox"></th>
@@ -19,7 +28,6 @@
 					<th colspan=2>항</th>
 					<th colspan=2>목</th>
 					<th>내역</th>
-					<th>목수정</th>
 				</tr>
 			</thead>
 
@@ -30,18 +38,17 @@
 					<td rowspan="{{ subsection.count }}" class="align-middle">{{ subsection.institution }}</td>
 					<td rowspan="{{ subsection.count }}" class="align-middle">{{ subsection.type }}</td>
 					<td rowspan="{{ subsection.count }}" class="align-middle">{{ subsection.code }}</td>
-					<td rowspan="{{ subsection.count }}" class="align-middle">{{ subsection.context }}</td>
+					<td rowspan="{{ subsection.count }}" class="align-middle"><a href="{% url 'subsection_edit' pk=subsection.pk %}">{{ subsection.context }}</a></td>
 					{% for paragraph in paragraph_list %}
 					{% if paragraph.subsection == subsection %}
 					
 					<td rowspan="{{ paragraph.count }}" class="align-middle">{{ paragraph.code }}</td>
-					<td rowspan="{{ paragraph.count }}" class="align-middle">{{ paragraph.context }}</td>
+					<td rowspan="{{ paragraph.count }}" class="align-middle"><a href="{% url 'paragraph_edit' pk=paragraph.pk %}">{{ paragraph.context }}</a></td>
 					{% for item in item_list %}
 					{% if item.paragraph == paragraph %}
 					<td class="align-middle">{{ item.code }}</td>
-					<td class="align-middle">{{ item.context }}</td>
+					<td class="align-middle"><a href="{% url 'item_edit' pk=item.pk %}">{{ item.context }}</a></td>
 					<td class="align-middle">{{ item.text }}</td>
-					<td class="align-middle"><a href="{% url 'item_edit' pk=item.pk %}" class="btn btn-primary btn-sm">수정</a></td>
 				</tr>
 				{% endif %}
 				{% endfor %}
