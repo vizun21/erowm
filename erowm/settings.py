@@ -139,7 +139,7 @@ SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 
 
 CRONJOBS = [
-    ('*/5 * * * *', 'accounting.cron.cron_database_syn', '>> ~/proj/accounting/cron.log'),
+    ('*/5 * * * *', 'accounting.cron.cron_database_syn', '>> ~/erowm/accounting/cron.log'),
             ]
 
 

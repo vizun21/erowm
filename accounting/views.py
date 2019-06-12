@@ -2763,12 +2763,14 @@ def upload_voucher(request):
             num += 1
         except Exception as e:
             print (e)
-            error += sindex + "번째행 실패\n"
+            error += sindex + ","
 
-    #오류출력
     #잔액계산 고려 (등록/삭제/수정 시)
-
-    return HttpResponse('<script type="text/javascript">window.close(); window.opener.parent.location.reload(); window.parent.location.href="/";</script>')
+    if error != "":
+        error = error[:-1] + "번째행 업로드 실패"
+        return HttpResponse("<script>alert('"+error+"');window.close(); window.opener.parent.location.reload(); window.parent.location.href='/';</script>")
+    else:
+        return HttpResponse('<script type="text/javascript">window.close(); window.opener.parent.location.reload(); window.parent.location.href="/";</script>')
 
 @login_required(login_url='/')
 def test(request):

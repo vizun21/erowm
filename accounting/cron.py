@@ -1,5 +1,6 @@
 from .models import Setting, Business, TBLBANK
 from django.db import connections
+from django.utils import timezone
 
 def cron_database_syn():
     tr_num = Setting.objects.get(name="transaction_num")
@@ -35,5 +36,5 @@ def cron_database_syn():
         tr_num.save()
         num += 1
 
-    print("cron complete")
+    print(str(timezone.now())+" cron complete")
     return redirect('other_settings')
