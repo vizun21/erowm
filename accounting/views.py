@@ -1430,21 +1430,32 @@ def regist_annual_budget(request):
 def budget_settlement(request, budget_type):
     business = get_object_or_404(Business, pk=request.session['business'])
     today = datetime.datetime.now()
-    this_year = int(DateFormat(today).format("Y"))
-    year = this_year
-    if request.method == "POST":
-        year = int(request.POST.get('year'))
+    s_type = request.GET.get('s_type', '1') #search_type
+    year = int(request.GET.get('year', DateFormat(today).format("Y")))
+    month = int(request.GET.get('month', DateFormat(today).format("m")))
+
     if business.type3_id == "어린이집":
-        start_date = datetime.datetime.strptime(str(year)+'-03-01', '%Y-%m-%d')
-        end_date = datetime.datetime.strptime(str(year+1)+'-03-01', '%Y-%m-%d')
+        session_start_date = datetime.datetime.strptime(str(year)+'-03-01', '%Y-%m-%d')
+        if s_type == '1':
+            start_date = datetime.datetime.strptime(str(year)+'-03-01', '%Y-%m-%d')
+            end_date = datetime.datetime.strptime(str(year+1)+'-03-01', '%Y-%m-%d')
+        else:
+            start_date = datetime.datetime.strptime(str(year)+'-'+str(month)+'-01', '%Y-%m-%d')
+            end_date = start_date + relativedelta(months=1)
     else:
-        start_date = datetime.datetime.strptime(str(year)+'-01-01', '%Y-%m-%d')
-        end_date = datetime.datetime.strptime(str(year+1)+'-01-01', '%Y-%m-%d')
+        session_start_date = datetime.datetime.strptime(str(year)+'-01-01', '%Y-%m-%d')
+        if s_type == '1':
+            start_date = datetime.datetime.strptime(str(year)+'-01-01', '%Y-%m-%d')
+            end_date = datetime.datetime.strptime(str(year+1)+'-01-01', '%Y-%m-%d')
+        else:
+            start_date = datetime.datetime.strptime(str(year)+'-'+str(month)+'-01', '%Y-%m-%d')
+            end_date = start_date + relativedelta(months=1)
 
     revenue_settlement_page = ''
     expenditure_settlement_page = ''
 
     total_budget = 0
+    now_budget = 0
     total_sum = 0
     total_difference = 0
 
@@ -1469,23 +1480,44 @@ def budget_settlement(request, budget_type):
                 When(transaction__business = business, then=Case(
                 When(transaction__Bkdate__gte = start_date, then=Case(
                 When(transaction__Bkdate__lt = end_date, then='transaction__Bkinput'))))))), 0))
+        item_list3 = Item.objects.filter(paragraph__subsection__institution = business.type3, paragraph__subsection__type = filter_type).annotate(
+            now_budget=Coalesce(Sum(Case(
+                When(transaction__business = business, then=Case(
+                When(transaction__Bkdate__gte = session_start_date, then=Case(
+                When(transaction__Bkdate__lt = start_date, then='transaction__Bkinput'))))))), 0))
         revenue_settlement_page = 'active'
+
     elif budget_type == "expenditure":
         item_list2 = Item.objects.filter(paragraph__subsection__institution = business.type3, paragraph__subsection__type = filter_type).annotate(
             total_sum=Coalesce(Sum(Case(
                 When(transaction__business = business, then=Case(
                 When(transaction__Bkdate__gte = start_date, then=Case(
                 When(transaction__Bkdate__lt = end_date, then='transaction__Bkoutput'))))))), 0))
+        item_list3 = Item.objects.filter(paragraph__subsection__institution = business.type3, paragraph__subsection__type = filter_type).annotate(
+            now_budget=Coalesce(Sum(Case(
+                When(transaction__business = business, then=Case(
+                When(transaction__Bkdate__gte = session_start_date, then=Case(
+                When(transaction__Bkdate__lt = start_date, then='transaction__Bkoutput'))))))), 0))
         expenditure_settlement_page = 'active'
 
     for idx, val in enumerate(item_list):
         item_list[idx].total_sum = item_list2[idx].total_sum
-        item_list[idx].total_difference = item_list[idx].total_budget - item_list[idx].total_sum
+        item_list[idx].now_budget = item_list[idx].total_budget - item_list3[idx].now_budget
+        item_list[idx].total_difference = item_list[idx].now_budget - item_list[idx].total_sum
         total_budget += item_list[idx].total_budget
+        now_budget += item_list[idx].now_budget
         total_sum += item_list[idx].total_sum
         total_difference += item_list[idx].total_difference
 
-    return render(request,'accounting/budget_settlement.html', {'settlement_management': 'active', 'master_login': request.session['master_login'], 'revenue_settlement_page': revenue_settlement_page, 'expenditure_settlement_page': expenditure_settlement_page, 'business': business, 'year_range': range(this_year, 1999, -1), 'year': year, 'subsection_list': subsection_list, 'paragraph_list': paragraph_list, 'item_list': item_list, 'budget_type': budget_type, 'total_budget': total_budget, 'total_sum': total_sum, 'total_difference': total_difference})
+    return render(request,'accounting/budget_settlement.html', {
+        'settlement_management': 'active', 'master_login': request.session['master_login'],
+        'revenue_settlement_page': revenue_settlement_page, 'expenditure_settlement_page': expenditure_settlement_page,
+        'business': business, 'year_range': range(year, 1999, -1), 'year': year,
+        'month_range': range(1, 13), 'month': month, 's_type': s_type,
+        'subsection_list': subsection_list, 'paragraph_list': paragraph_list,
+        'item_list': item_list, 'budget_type': budget_type,
+        'total_budget': total_budget, 'now_budget': now_budget,
+        'total_sum': total_sum, 'total_difference': total_difference})
 
 @login_required(login_url='/')
 def print_settlement(request):
