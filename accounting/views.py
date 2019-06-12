@@ -158,7 +158,7 @@ def home(request):
     #--기타필요경비, 특별활동비, 장/단기 차입금 예산 결산 자료
     data_list2 = Item.objects.filter(
         paragraph__subsection__institution = business.type3
-    ).filter(Q(context__contains="기타 필요경비")|Q(context__contains="특별활동비")|Q(context__contains="차입금")
+    ).filter(Q(context__contains="기타필요경비")|Q(context__contains="특별활동비")|Q(context__contains="차입금")
     ).annotate(
         budget_amount=Coalesce(Sum(Case(
             When(budget__business = business, then=Case(
@@ -172,7 +172,7 @@ def home(request):
 
     data_list = Item.objects.filter(
         paragraph__subsection__institution = business.type3
-    ).filter(Q(context__contains="기타 필요경비")|Q(context__contains="특별활동비")|Q(context__contains="차입금")
+    ).filter(Q(context__contains="기타필요경비")|Q(context__contains="특별활동비")|Q(context__contains="차입금")
     ).annotate(
         settlement_amount=Coalesce(Sum(Case(
             When(transaction__business = business, then=Case(

@@ -56,10 +56,10 @@
 						</tr>
 						<tr>
 							{% for data in data_list %}
-							{% if "기타 필요경비" in data.context and data.paragraph.subsection.type == "수입" %}
+							{% if "기타필요경비" in data.context and data.paragraph.subsection.type == "수입" %}
 							<td>기타필요경비수입</td>
 							<td colspan="2">{{ data.settlement_amount|intcomma }}</td>
-							{% elif "기타 필요경비" in data.context and data.paragraph.subsection.type == "지출" %}
+							{% elif "기타필요경비" in data.context and data.paragraph.subsection.type == "지출" %}
 							<td>기타필요경비지출</td>
 							<td colspan="2">{{ data.settlement_amount|intcomma }}</td>
 							{% endif %}
@@ -204,7 +204,7 @@
 						</tr>
 						<tr>
 							{% for data in data_list %}
-							{% if "기타 필요경비" in data.context %}
+							{% if "기타필요경비" in data.context %}
 							{% if data.paragraph.subsection.type == "수입" %}
 							<td>기타필요경비</td>
 							<td>{{ data.budget_amount|intcomma }}</td>
