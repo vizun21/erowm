@@ -20,6 +20,7 @@
 						<th>은행명</th>
 						<th>계좌번호</th>
 						<th>계좌구분</th>
+						<th>계좌상태</th>
 						<th>수정</th>
 					</tr>
 				</thead>
@@ -32,6 +33,7 @@
 						<td>{{ list.bank }}</td>
 						<td>{{ list.account_number }}</td>
 						<td>{% if list.bkdiv == 'C' %}법인{% elif list.bkdiv == 'P' %}개인{% endif %}</td>
+						<td>{{ list.act_status }}</td>
 						<td class="text-center"><a class="btn btn-primary btn-sm py-0" href="{% url 'account_edit' pk=list.pk %}">수정</a>
 					</tr>
 					{% endfor %}
