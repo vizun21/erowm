@@ -25,6 +25,7 @@ from django.db.models.functions import Coalesce
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
 import json
+import requests
 
 # Create your views here.
 
@@ -292,6 +293,21 @@ def business_info(request):
 def account_list(request):
     business = get_object_or_404(Business, pk=request.session['business'])
     lists = Account.objects.filter(business=business)
+    url = "https://ssl.bankda.com/partnership/partner/account_list_userid_xml.php"
+    #headers = {'content-type': 'application/soap+xml'}
+    data = {'service_type': 'basic', 'partner_id': 'vizun21',
+            'user_id': request.user.username, 'user_pw': request.user.password[34:],
+            'char_set': 'utf8'}
+    resMsg = requests.post(url, data=data)
+
+    import xml.etree.ElementTree as ET
+    root = ET.fromstring(resMsg.content.decode('utf-8'))
+
+    for list in lists:
+        for account in root.iter("account_info"):
+            if account.attrib['actaccountnum'] == list.account_number:
+                list.act_status = account.attrib['act_status']
+    
     return render(request, 'accounting/account_list.html', {'lists': lists, 'business': business, 'accounting_management': 'active', 'account_list': 'active', 'master_login': request.session['master_login']})
 
 @login_required(login_url='/')
