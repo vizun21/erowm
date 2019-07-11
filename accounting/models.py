@@ -168,8 +168,8 @@ class Account(models.Model):
     account_pw = models.CharField(max_length=20)
     bkdiv = models.CharField(max_length=1)
     Mjumin_1 = models.CharField(max_length=6, null=True, blank=True)
-    webid = models.CharField(max_length=30)
-    webpw = models.CharField(max_length=30)
+    webid = models.CharField(max_length=30, null=True, blank=True)
+    webpw = models.CharField(max_length=30, null=True, blank=True)
     
     def __str__(self):
         return self.renames

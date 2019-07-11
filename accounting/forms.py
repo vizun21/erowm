@@ -401,14 +401,6 @@ class AccountForm(forms.ModelForm):
         choices = ([('C','법인'), ('P','개인')]), initial='C', required = True,
     )
 
-    webpw = forms.CharField(
-        label="간편조회PW",
-        strip=False,
-        widget=forms.PasswordInput(
-            attrs={
-        })
-    )
-
     class Meta:
         model = Account
         fields = ('business', 'renames', 'bank', 'account_number', 'account_pw', 'bkdiv', 'webid', 'webpw')
@@ -424,11 +416,11 @@ class AccountForm(forms.ModelForm):
                 'unique_together': "이미 등록된 계좌입니다. 확인하고 다시 등록해주세요.",
             }
         }
-    '''
+
     def __init__(self, *args, **kwargs):
         super(AccountForm, self).__init__(*args, **kwargs)
-        self.fields['slug'].widget = forms.HiddenInput()
-    '''
+        self.fields['webpw'].widget = forms.PasswordInput()
+        self.fields['webpw'].strip = False
 
 
 class SubsectionForm(forms.ModelForm):

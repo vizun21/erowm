@@ -315,20 +315,40 @@ def account_create(request):
     business = get_object_or_404(Business, pk=request.session['business'])
     main_acct = Account.objects.filter(business=business, main=True).count()
     if request.method == "POST":
-        regist_done = request.POST.get('regist_done')
-        if regist_done:
-            return redirect("account_list")
+        account_flag = account_check(request)
+        if account_flag == True:
+            Bjumin = business.reg_number.split("-")
+            url = "https://ssl.bankda.com/partnership/user/account_add.php"
+            data = {'directAccess': 'y', 'partner_id': "vizun21", 'service_type': "basic",
+                'user_id': request.user.username, 'user_pw': request.user.password[34:],
+                'Command': "update", 'bkdiv': request.POST.get('bkdiv'),
+                'bkcode': request.POST.get('bank'),
+                'bkacctno': request.POST.get('account_number'),
+                'bkacctpno_pw': request.POST.get('account_pw'),
+                'Mjumin_1': business.owner_reg_number1, 'Mjumin_2': "0000000",
+                'Bjumin_1': Bjumin[0], 'Bjumin_2': Bjumin[1], 'Bjumin_3': Bjumin[2],
+                'webid': request.POST.get('webid'), 'webpw': request.POST.get('webpw'),
+                'renames': request.POST.get('renames'), 'char_set': "utf-8"
+            }
+            print(data)
+            resMsg = requests.post(url, data=data)
+            if resMsg.content.decode('utf-8') == "ok":
+                return redirect('account_list')
+            else:
+                pass
+                #등록한 계좌내용 삭제? 오류반환
         else:
             form = AccountForm(request.POST)
             if form.is_valid():
                 account = form.save(commit=False)
                 if main_acct:
                     account.main = False
-                account.save()
+                #account.save()
                 return redirect('account_list')
+            return render(request, 'accounting/account_create.html', {'form': form, 'business': business})
     else:
         form = AccountForm(initial={'business': business})
-    return render(request, 'accounting/account_create.html', {'form': form, 'business': business})
+        return render(request, 'accounting/account_create.html', {'form': form, 'business': business})
 
 @login_required(login_url='/')
 def account_edit(request, pk):
@@ -336,27 +356,42 @@ def account_edit(request, pk):
     business = get_object_or_404(Business, pk=request.session['business'])
     main_acct = Account.objects.filter(business=business, main=True).count()
     if request.method == "POST":
-        regist_done = request.POST.get('regist_done')
-        if regist_done:
-            return redirect("account_list")
+        account_flag = account_check(request)
+        if account_flag == True:
+            Bjumin = business.reg_number.split("-")
+            url = "https://ssl.bankda.com/partnership/user/account_fix.php"
+            data = {'directAccess': 'y', 'partner_id': "vizun21", 'service_type': "basic",
+                'user_id': request.user.username, 'user_pw': request.user.password[34:],
+                'Command': "update", 'bkdiv': request.POST.get('bkdiv'),
+                'bkcode': request.POST.get('bank'),
+                'bkacctno': request.POST.get('account_number'),
+                'bkacctpno_pw': request.POST.get('account_pw'),
+                'Mjumin_1': business.owner_reg_number1, 'Mjumin_2': "0000000",
+                'Bjumin_1': Bjumin[0], 'Bjumin_2': Bjumin[1], 'Bjumin_3': Bjumin[2],
+                'webid': request.POST.get('webid'), 'webpw': request.POST.get('webpw'),
+                'renames': request.POST.get('renames'), 'char_set': "utf-8"
+            }
+            print(data)
+            resMsg = requests.post(url, data=data)
+            if resMsg.content.decode('utf-8') == "ok":
+                return redirect('account_list')
+            else:
+                print(resMsg.content.decode('utf-8'))
+                print("뱅크다등록오류")
+                #등록한 계좌내용 삭제? 오류반환
         else:
             form = AccountForm(request.POST, instance=account)
-            if form.is_valid():
-                account = form.save(commit=False)
-                if main_acct:
-                    account.main = False
-                account.save()
-                return redirect('account_list')
+            if not form.is_valid():
+                return render(request, 'accounting/account_edit.html', {'form': form, 'business': business})
     else:
         form = AccountForm(instance=account)
-    return render(request, 'accounting/account_edit.html', {'acctpk':pk, 'form': form, 'business': business})
+        return render(request, 'accounting/account_edit.html', {'acctpk':pk, 'form': form, 'business': business})
 
 @login_required(login_url='/')
 def account_check(request):
     command = request.POST.get("command", "create")
     print(command)
     business = get_object_or_404(Business, pk=request.session['business'])
-    account_check = False
     main_acct = Account.objects.filter(business=business, main=True).count()
     if request.method == "POST":
         if command == "edit":
@@ -367,10 +402,7 @@ def account_check(request):
                 if main_acct:
                     account.main = False
                 account.save()
-                account_check = True
-                password = request.user.password[34:]
-                Bjumin = business.reg_number.split("-")
-                return HttpResponse(json.dumps({'account_check': account_check, 'username': request.user.username, 'password': password, 'Mjumin_1': business.owner_reg_number1, 'Bjumin_1': Bjumin[0], 'Bjumin_2': Bjumin[1], 'Bjumin_3': Bjumin[2]}), content_type="application/json")
+                return True
         else:
             accountform = AccountForm(request.POST)
             if accountform.is_valid():
@@ -378,11 +410,8 @@ def account_check(request):
                 if main_acct:
                     account.main = False
                 account.save()
-                account_check = True
-                password = request.user.password[34:]
-                Bjumin = business.reg_number.split("-")
-                return HttpResponse(json.dumps({'account_check': account_check, 'username': request.user.username, 'password': password, 'Mjumin_1': business.owner_reg_number1, 'Bjumin_1': Bjumin[0], 'Bjumin_2': Bjumin[1], 'Bjumin_3': Bjumin[2]}), content_type="application/json")
-    return HttpResponse(json.dumps({'account_check': account_check}), content_type="application/json")
+                return True
+    return False
 
 @login_required(login_url='/')
 def account_delete(request, pk):
@@ -655,7 +684,7 @@ def transaction_history(request):
     acct = get_object_or_404(Account, business=business, id=acctid)
     start_date = datetime.datetime.strptime(year+'-'+month+'-01', '%Y-%m-%d')
     end_date = start_date + relativedelta(months=1)
-
+    
     input_items = Item.objects.filter(paragraph__subsection__institution = business.type3).filter(paragraph__subsection__type="수입").exclude(paragraph__subsection__code=0)
     output_items = Item.objects.filter(paragraph__subsection__institution = business.type3).filter(paragraph__subsection__type="지출")
     input_subsections = Subsection.objects.filter(institution=business.type3).filter(type="수입")
@@ -2819,6 +2848,36 @@ def upload_voucher(request):
         return HttpResponse("<script>alert('"+error+"');window.close(); window.opener.parent.location.reload(); window.parent.location.href='/';</script>")
     else:
         return HttpResponse('<script type="text/javascript">window.close(); window.opener.parent.location.reload(); window.parent.location.href="/";</script>')
+
+@login_required(login_url='/')
+def tr_syn(request):
+    business = get_object_or_404(Business, pk=request.session['business'])
+    month = request.GET.get('month')
+    acctid = request.GET.get('acctid')
+    year = request.GET.get('year')
+    month = request.GET.get('month')
+    page = request.GET.get('page')
+    page2 = request.GET.get('page2')
+    update_list = Transaction.objects.filter(business=business, Bkdate__year = year, Bkdate__month = month).order_by('Bkdate', 'id')
+    
+    first_tr = update_list.first()
+    jango = first_tr.Bkjango
+
+    for idx, update in enumerate(update_list):
+        print(update.Bkdate, update.Bkinput, update.Bkoutput, update.Bkjango)
+        if idx != 0:
+            if update.Bkinput != 0 :
+                    jango = jango + update.Bkinput
+            elif update.Bkoutput != 0 :
+                    jango = jango - update.Bkoutput
+            print(jango)
+            update.Bkjango = jango
+            update.save()
+
+    response = redirect('transaction_history')
+    response['Location'] += '?page='+page+'&page2='+page2+'&year='+year+'&month='+month+'&acctid='+acctid
+    return response
+
 
 @login_required(login_url='/')
 def test(request):
