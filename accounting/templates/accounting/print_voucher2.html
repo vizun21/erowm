@@ -31,7 +31,7 @@
 		<tbody style="text-align:center">
 			<tr height="8%">
 				<td>관</td>
-				<td>{{ transaction.item.context }}</td>
+				<td>{{ transaction.item.paragraph.subsection.context }}</td>
 				<td colspan="2">발의</td>
 				<td colspan="2">{{ transaction.Bkdate|date:"Y-m-d" }}</td>
 			</tr>
@@ -43,7 +43,7 @@
 			</tr>
 			<tr height="8%">
 				<td>목</td>
-				<td>{{ transaction.item.paragraph.subsection.context }}</td>
+				<td>{{ transaction.item.context }}</td>
 				<td colspan="2">총계정원장등재</td>
 				<td colspan="2">{{ transaction.Bkdate|date:"Y-m-d" }}</td>
 			</tr>
