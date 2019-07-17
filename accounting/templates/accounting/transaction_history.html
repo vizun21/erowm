@@ -300,6 +300,7 @@
 							<th colspan=3>거래리스트</th>
 							<th colspan=11 style="background:None;border-top:1px solid #ffffff;border-right:1px solid #ffffff" class="text-left">
 								<a href="#" onclick="window.open('{% url "popup_transaction_direct" %}?year={{ year }}&month={{ month }}', '거래직접등록','width=1000, height=300');" class="btn btn-primary btn-sm py-0">직접등록</a>
+								<a href="{% url "tr_syn" %}?year={{ year }}&month={{ month }}&page={{page}}&page2={{page2}}&acctid={{acctid}}" class="btn btn-primary btn-sm py-0">거래내역잔액동기화</a>
 							</th>
 						</tr>
 						<tr>

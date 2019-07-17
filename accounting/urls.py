@@ -99,6 +99,7 @@ urlpatterns = [
     url(r'^authkey_edit/$', views.authkey_edit, name='authkey_edit'),
     
     url(r'^set_proofnum/$', views.set_proofnum, name='set_proofnum'),
+    url(r'^tr_syn/$', views.tr_syn, name='tr_syn'),
 
     #url(r'^/$', views., name=''),
     url(r'^test/$', views.test, name='test'),

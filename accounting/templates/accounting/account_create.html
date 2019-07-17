@@ -42,11 +42,30 @@
 		{% endfor %}
 		</table>
 		<!--<button type="submit" class="save btn btn-outline-primary">등록</button>-->
-		<input class="btn btn-outline-primary" type="button" value="등록" id="btn-regist-account">
+		<button class="btn btn-outline-primary" type="submit">등록</button>
 		<button type="button" class="btn btn-outline-primary" onclick="cancelCheck();">취소</button>
-		<input type="hidden" id="regist_done" name="regist_done"/>
+		<!--<input type="hidden" id="regist_done" name="regist_done"/>-->
 	</form>
 
+<script type="text/javascript">
+$('#id_bank').change(function() {
+	if( this.value == '04' || this.value == '26' || this.value == '28' || this.value == '31' || this.value == '48' || this.value == '91' ) {
+		$('#id_webid').removeAttr('disabled');
+		$('#id_webid').attr('required', 'required');
+		$('#id_webpw').removeAttr('disabled');
+		$('#id_webpw').attr('required', 'required');
+	}
+	else {
+		$('#id_webid').attr('disabled', true);
+		$('#id_webid').removeAttr('required');
+		$('#id_webid').val('');
+		$('#id_webpw').attr('disabled', true);
+		$('#id_webpw').removeAttr('required');
+		$('#id_webpw').val('');
+	}
+});
+</script>
+<!--
 <script type="text/javascript">
 $('#btn-regist-account').click(function() {
 	var formData = $("#writeForm").serialize();
@@ -105,4 +124,5 @@ $('#btn-regist-account').click(function() {
 	});
 });
 </script>
+-->
 {% endblock %}
