@@ -1565,6 +1565,136 @@ def budget_settlement(request, budget_type):
         'total_sum': total_sum, 'total_difference': total_difference})
 
 @login_required(login_url='/')
+def trial_balance(request):
+    if request.method == "GET":
+        business = get_object_or_404(Business, pk=request.session['business'])
+        today = datetime.datetime.now()
+        cyear = int(DateFormat(today).format("Y"))
+        cmonth = int(DateFormat(today).format("m"))
+
+        if business.type3_id == "어린이집":
+            syear = cyear
+            smonth = 3
+            eyear = cyear+1
+            emonth = 2
+            session_start_date = datetime.datetime.strptime(str(syear)+'-03-01', '%Y-%m-%d')
+        else:
+            syear = cyear
+            smonth = 1
+            eyear = cyear
+            emonth = 12
+            session_start_date = datetime.datetime.strptime(str(syear)+'-01-01', '%Y-%m-%d')
+
+        year = int(request.GET.get('year', syear))
+        month = int(request.GET.get('month', smonth))
+        year2 = int(request.GET.get('year2', eyear))
+        month2 = int(request.GET.get('month2', emonth))
+        start_date = datetime.datetime.strptime(str(year)+'-'+str(month)+'-01', '%Y-%m-%d')
+        if month2 <= 11:
+            end_date = datetime.datetime.strptime(str(year2)+'-'+str(month2+1)+'-01', '%Y-%m-%d')
+        else:
+            end_date = datetime.datetime.strptime(str(year2+1)+'-'+str(month2-11)+'-01', '%Y-%m-%d')
+
+        """
+        item_list = Item.objects.filter(paragraph__subsection__institution = business.type3
+            ).annotate(total_budget=Coalesce(Sum(Case(
+                When(budget__business = business, then=Case(When(budget__year = year, then='budget__price'))))), 0))
+        """
+
+        item_list = Item.objects.filter(paragraph__subsection__institution = business.type3
+            ).annotate(cumulative_income=Coalesce(Sum(Case(
+                When(transaction__business = business, then=Case(
+                When(transaction__Bkdate__gte = session_start_date, then=Case(
+                When(transaction__Bkdate__lt = end_date, then=Case(
+                When(transaction__Bkinput__isnull = False, then='transaction__Bkinput'))))))))), 0)
+            ).order_by('paragraph__subsection__type', 'paragraph__subsection__code', 'paragraph__code', 'code').exclude(code=0)
+
+        for idx, item in enumerate(item_list):
+            item_list2 = Item.objects.filter(pk=item.pk
+            ).annotate(income=Coalesce(Sum(Case(
+                When(transaction__business = business, then=Case(
+                When(transaction__Bkdate__gte = start_date, then=Case(
+                When(transaction__Bkdate__lt = end_date, then=Case(
+                When(transaction__Bkinput__isnull = False, then='transaction__Bkinput'))))))))), 0))
+            item_list3 = Item.objects.filter(pk=item.pk
+            ).annotate(expenditure=Coalesce(Sum(Case(
+                When(transaction__business = business, then=Case(
+                When(transaction__Bkdate__gte = start_date, then=Case(
+                When(transaction__Bkdate__lt = end_date, then=Case(
+                When(transaction__Bkoutput__isnull = False, then='transaction__Bkoutput'))))))))), 0))
+            item_list4 = Item.objects.filter(pk=item.pk
+            ).annotate(cumulative_expenditure=Coalesce(Sum(Case(
+                When(transaction__business = business, then=Case(
+                When(transaction__Bkdate__gte = session_start_date, then=Case(
+                When(transaction__Bkdate__lt = end_date, then=Case(
+                When(transaction__Bkoutput__isnull = False, then='transaction__Bkoutput'))))))))), 0))
+
+            item_list[idx].income = item_list2[0].income
+            item_list[idx].expenditure = item_list3[0].expenditure
+            item_list[idx].cumulative_expenditure = item_list4[0].cumulative_expenditure
+
+    return render(request, 'accounting/trial_balance.html', {
+        'settlement_management': 'active', 'trial_balance_page': 'active',
+        'year_range': range(cyear+1, 1999, -1), 'month_range': range(1, 13),
+        'year': year, 'month': month, 'year2': year2, 'month2': month2,
+        'item_list': item_list
+    })
+
+@login_required(login_url='/')
+def annual_trial_balance(request):
+    if request.method == "GET":
+        business = get_object_or_404(Business, pk=request.session['business'])
+        today = datetime.datetime.now()
+        cyear = int(DateFormat(today).format("Y"))
+        year = int(request.GET.get('year', cyear))
+
+        if business.type3_id == "어린이집":
+            session_start_date = datetime.datetime.strptime(str(year)+'-03-01', '%Y-%m-%d')
+            session_end_date = datetime.datetime.strptime(str(year+1)+'-03-01', '%Y-%m-%d')
+        else:
+            session_start_date = datetime.datetime.strptime(str(year)+'-01-01', '%Y-%m-%d')
+            session_end_date = datetime.datetime.strptime(str(year+1)+'-01-01', '%Y-%m-%d')
+
+        item_list = Item.objects.filter(paragraph__subsection__institution = business.type3
+            ).annotate(total_settlement=Coalesce(Sum(Case(
+                When(transaction__business = business, then=Case(
+                When(transaction__Bkdate__gte = session_start_date, then=Case(
+                When(transaction__Bkdate__lt = session_end_date, then=Case(
+                When(transaction__Bkinput = 0, then='transaction__Bkoutput'),
+                default='transaction__Bkinput')))))))), 0)
+        ).order_by('paragraph__subsection__type', 'paragraph__subsection__code', 'paragraph__code', 'code').exclude(code=0)
+
+        ym_list = []
+        for x in range(0, 12):
+            date = session_start_date + relativedelta(months=x)
+            ym_list.append({'y': DateFormat(date).format("Y"), 'm': DateFormat(date).format("m")})
+
+        for idx, item in enumerate(item_list):
+            ms_list = []
+
+            for ym in ym_list:
+                start_date = datetime.datetime.strptime(ym['y']+'-'+ym['m']+'-01', '%Y-%m-%d')
+                end_date = start_date + relativedelta(months=1)
+
+                item_list3 = Item.objects.filter(pk=item.pk
+                ).annotate(income=Coalesce(Sum(Case(
+                    When(transaction__business = business, then=Case(
+                    When(transaction__Bkdate__gte = start_date, then=Case(
+                    When(transaction__Bkdate__lt = end_date, then=Case(
+                    When(transaction__Bkinput = 0, then='transaction__Bkoutput'),
+                    default='transaction__Bkinput')))))))), 0))
+
+                ms_list.append(item_list3[0].income)
+
+            item_list[idx].ms_list = ms_list
+
+    return render(request, 'accounting/annual_trial_balance.html', {
+        'settlement_management': 'active', 'annual_trial_balance_page': 'active',
+        'ym_list': ym_list, 'year_range': range(cyear+1, 1999, -1),'year': year,
+        'item_list': item_list
+    })
+
+@login_required(login_url='/')
 def print_settlement(request):
     business = get_object_or_404(Business, pk=request.session['business'])
     today = datetime.datetime.now()

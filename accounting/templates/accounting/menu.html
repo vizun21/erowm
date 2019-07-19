@@ -41,6 +41,8 @@
 						<a class="dropdown-item {{ revenue_settlement_page }}" href="{% url 'budget_settlement' budget_type='revenue' %}">세입결산</a>
 						<a class="dropdown-item {{ expenditure_settlement_page }}" href="{% url 'budget_settlement' budget_type='expenditure' %}">세출결산</a>
 						<a class="dropdown-item {{ print_settlement_page }}" href="{% url 'print_settlement' %}">결산출력</a>
+						<a class="dropdown-item {{ trial_balance_page }}" href="{% url 'trial_balance' %}">합계시산표</a>
+						<a class="dropdown-item {{ annual_trial_balance_page }}" href="{% url 'annual_trial_balance' %}">연별시산표</a>
 					</div>
 				</li>
 				<li class="nav-item {{ accounting_report }} dropdown">
