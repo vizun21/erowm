@@ -178,7 +178,8 @@ class Account(models.Model):
 class Subsection(models.Model):
     class Meta:
         unique_together = (('institution', 'type', 'code'),)
-
+    
+    year = models.CharField(max_length=4)
     institution = models.ForeignKey('accounting.Business_type', on_delete=models.PROTECT)
     type = models.CharField(max_length=2)
     code = models.PositiveSmallIntegerField(validators=[MinValueValidator(0), MaxValueValidator(11)])
@@ -192,6 +193,7 @@ class Paragraph(models.Model):
     class Meta:
         unique_together = (('subsection', 'code'),)
 
+    year = models.CharField(max_length=4)
     subsection = models.ForeignKey('accounting.Subsection', on_delete=models.PROTECT)
     code = models.PositiveSmallIntegerField(validators=[MinValueValidator(0), MaxValueValidator(9)])
     context = models.CharField(max_length=20)
@@ -204,6 +206,7 @@ class Item(models.Model):
     class Meta:
         unique_together = (('paragraph', 'code'),)
 
+    year = models.CharField(max_length=4)
     paragraph = models.ForeignKey('accounting.Paragraph', on_delete=models.PROTECT)
     code = models.PositiveSmallIntegerField(validators=[MinValueValidator(0), MaxValueValidator(9)])
     context = models.CharField(max_length=20)

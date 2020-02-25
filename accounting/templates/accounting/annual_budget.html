@@ -34,7 +34,13 @@
 								<option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
 								{% endfor %}
 							</select>
-							<input type="submit" value="조회">
+							<input type="submit" onClick="loadOriginal(0)" value="조회">
+							<input type="hidden" name="have_sub_bt"/>
+							{% if budget_type|slice:":13" == "supplementary" %}
+							<input type="button" onClick="loadOriginal(1)" value="{% if budget_type|slice:":21" == 'supplementary_revenue' %}세입{% elif budget_type|slice:":25" == 'supplementary_expenditure' %}세출{% endif %}예산불러오기">
+							{% else %}
+							<input type="button" onClick="loadOriginal(2)" value="전년도예산불러오기">
+							{% endif %}
 						</td>
 					</tr>
 					<tr>
@@ -207,6 +213,12 @@ function delete_row(index) {
 			},
 		});
 	});
+}
+
+function loadOriginal(have_sub_bt) {
+	var f = document.searchForm;
+	f.have_sub_bt.value = have_sub_bt;
+	f.submit();
 }
 
 function calc(index) {

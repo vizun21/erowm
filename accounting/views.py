@@ -42,7 +42,7 @@ def main(request):
     else:
         request.session['master_login'] = False
         if user.profile.level_id >= LOCAL:
-            return redirect("user_list")
+            return redirect("user_transform")
         elif user.profile.level_id >= SALES:
             return redirect("user_transform")
         else:
@@ -1357,15 +1357,29 @@ def annual_budget(request, budget_type):
     supplementary_revenue_page = ''
     supplementary_expenditure_page = ''
 
+    have_sub_bt = request.POST.get('have_sub_bt')
+
+    print(have_sub_bt, type(have_sub_bt))
+
     if budget_type == "revenue" or budget_type[:21] == "supplementary_revenue":
-        budget_list = Budget.objects.filter(business=business, year=year, item__paragraph__subsection__type="수입", type=budget_type)
+        if have_sub_bt == "1":
+            budget_list = Budget.objects.filter(business=business, year=year, item__paragraph__subsection__type="수입", type="revenue")
+        elif have_sub_bt == "2":
+            budget_list = Budget.objects.filter(business=business, year=year-1, item__paragraph__subsection__type="수입", type="revenue")
+        else:
+            budget_list = Budget.objects.filter(business=business, year=year, item__paragraph__subsection__type="수입", type=budget_type)
         spi_list = Item.objects.filter(paragraph__subsection__institution = business.type3, paragraph__subsection__type = "수입").exclude(code=0)
         if budget_type == "revenue":
             revenue_budget_page = 'active'
         else:
             supplementary_revenue_page = 'active'
     elif budget_type == "expenditure" or budget_type[:25] == "supplementary_expenditure":
-        budget_list = Budget.objects.filter(business=business, year=year, item__paragraph__subsection__type="지출", type=budget_type)
+        if have_sub_bt == "1":
+            budget_list = Budget.objects.filter(business=business, year=year, item__paragraph__subsection__type="지출", type="expenditure")
+        if have_sub_bt == "2":
+            budget_list = Budget.objects.filter(business=business, year=year-1, item__paragraph__subsection__type="지출", type="expenditure")
+        else:
+            budget_list = Budget.objects.filter(business=business, year=year, item__paragraph__subsection__type="지출", type=budget_type)
         spi_list = Item.objects.filter(paragraph__subsection__institution = business.type3, paragraph__subsection__type = "지출").exclude(code=0)
         if budget_type == "expenditure":
             expenditure_budget_page = 'active'
@@ -1413,6 +1427,173 @@ def annual_budget(request, budget_type):
                     sub_budget += sub_data
 
     return render(request, 'accounting/annual_budget.html', {'total_revenue': total_revenue, 'total_expenditure': total_expenditure, 'total_difference': total_difference,'budget_type': budget_type, 'sub_budget': sub_budget, 'spi_list': spi_list, 'budget_list': budget_list, 'budget_management': 'active', 'revenue_budget_page': revenue_budget_page, 'expenditure_budget_page': expenditure_budget_page, 'supplementary_revenue_page': supplementary_revenue_page, 'supplementary_expenditure_page': supplementary_expenditure_page, 'master_login': request.session['master_login'], 'business': business, 'year_range': range(this_year, 1999, -1), 'year': year})
+
+@login_required(login_url='/')
+def print_yearly_budget(request, budget_type):
+    business = get_object_or_404(Business, pk=request.session['business'])
+    today = datetime.datetime.now()
+    this_year = int(DateFormat(today).format("Y"))
+    if request.method == "POST":
+        year = int(request.POST.get('year'))
+
+    if budget_type in ['revenue', 'supplementary_revenue']:
+        stype_filter = '수입'
+    elif budget_type in ['expenditure', 'supplementary_expenditure']:
+        stype_filter='지출'
+
+    
+    total = Budget.objects.filter(business=business, year=year, item__paragraph__subsection__type=stype_filter, type=budget_type).aggregate(total=Coalesce(Sum('price'), 0))['total']
+    xtotal = Budget.objects.filter(business=business, year=year-1, item__paragraph__subsection__type=stype_filter, type=budget_type).aggregate(total=Coalesce(Sum('price'), 0))['total']
+    dtotal = total - xtotal
+    if 'supplementary' in budget_type:
+        try:
+            sp_budget_type = Budget.objects.filter(business=business, year=year, type__icontains=budget_type).order_by('type').last().type
+            total = Budget.objects.filter(business=business, year=year, item__paragraph__subsection__type=stype_filter, type=sp_budget_type).aggregate(total=Coalesce(Sum('price'), 0))['total']
+            xtotal = Budget.objects.filter(business=business, year=year, item__paragraph__subsection__type=stype_filter, type=budget_type[14:]).aggregate(total=Coalesce(Sum('price'), 0))['total']
+            dtotal = total - xtotal
+        except Exception as ex:
+            print(ex)
+
+    budget_list = []
+    spi_list = []
+    paragraph_list = []
+
+    if 'supplementary' in budget_type:
+        subsection_list = Subsection.objects.filter(type=stype_filter, institution=business.type3).exclude(code=0)
+        for subsection in subsection_list:
+            sp_budget_type = Budget.objects.filter(business=business, year=year, type__icontains=budget_type).order_by('type').last().type
+            subsection.s_total = Budget.objects.filter(business=business, year=year, item__paragraph__subsection = subsection, type=sp_budget_type).aggregate(total=Coalesce(Sum('price'), 0))['total']
+            subsection.xs_total = Budget.objects.filter(business=business, year=year, item__paragraph__subsection = subsection, type=budget_type[14:]).aggregate(total=Coalesce(Sum('price'), 0))['total']
+            subsection.ds_total = subsection.s_total - subsection.xs_total
+    
+            paragraph_list = Paragraph.objects.filter(subsection=subsection)
+            for paragraph in paragraph_list:
+                paragraph.p_total = Budget.objects.filter(business=business, year=year, item__paragraph=paragraph, type=sp_budget_type).aggregate(total=Coalesce(Sum('price'), 0))['total']
+                paragraph.xp_total = Budget.objects.filter(business=business, year=year, item__paragraph=paragraph, type=budget_type[14:]).aggregate(total=Coalesce(Sum('price'), 0))['total']
+                paragraph.dp_total = paragraph.p_total - paragraph.xp_total
+    
+                item_list = Item.objects.filter(paragraph=paragraph)
+                for item in item_list:
+                    try:
+                        budget = Budget.objects.get(business=business, year=year, item=item, type=sp_budget_type)
+                        item.i_total = budget.price
+                        item.xi_total = Budget.objects.get(business=business, year=year, item=item, type=budget_type[14:]).price
+                        item.di_total = item.i_total - item.xi_total
+
+                        context_list = []
+                        unit_price_list = []
+                        cnt_list = []
+                        months_list = []
+                        percent_list = []
+                        sub_price_list = []
+
+                        sub_columns = ['item','context','unit_price','cnt','months','percent','sub_price']
+                        context_list = budget.context.split("|")
+                        unit_price_list = budget.unit_price.split("|")
+                        cnt_list = budget.cnt.split("|")
+                        months_list = budget.months.split("|")
+                        if budget.percent is not None:
+                            percent_list = budget.percent.split("|")
+                        sub_price_list = budget.sub_price.split("|")
+                        row_list = []
+                        for idx, val in enumerate(context_list):
+                            r = []
+                            if val != None:
+                                r.append(budget.item.id)
+                                r.append(context_list[idx])
+                                r.append(unit_price_list[idx])
+                                r.append(cnt_list[idx])
+                                r.append(months_list[idx])
+                                if budget.percent is not None:
+                                    r.append(percent_list[idx])
+                                else:
+                                    r.append('')
+                                r.append(sub_price_list[idx])
+                            row_list.append(r)
+                            item.sub_data = [ dict(zip(sub_columns,row)) for row in row_list ]
+                    except Exception as ex:
+                        print(ex)
+                        item.i_total = 0
+                        item.xi_total = Budget.objects.get(business=business, year=year, item=item, type=budget_type[14:]).price
+                        item.di_total = item.i_total - item.xi_total
+                        item.sub_data = []
+                paragraph.item_list = item_list
+            subsection.paragraph_list = paragraph_list
+    else:
+        subsection_list = Subsection.objects.filter(type=stype_filter, institution=business.type3).exclude(code=0)
+        for subsection in subsection_list:
+            subsection.s_total = Budget.objects.filter(business=business, year=year, item__paragraph__subsection = subsection, type=budget_type).aggregate(total=Coalesce(Sum('price'), 0))['total']
+            subsection.xs_total = Budget.objects.filter(business=business, year=year-1, item__paragraph__subsection = subsection, type=budget_type).aggregate(total=Coalesce(Sum('price'), 0))['total']
+            subsection.ds_total = subsection.s_total - subsection.xs_total
+    
+            paragraph_list = Paragraph.objects.filter(subsection=subsection)
+            for paragraph in paragraph_list:
+                paragraph.p_total = Budget.objects.filter(business=business, year=year, item__paragraph=paragraph, type=budget_type).aggregate(total=Coalesce(Sum('price'), 0))['total']
+                paragraph.xp_total = Budget.objects.filter(business=business, year=year-1, item__paragraph=paragraph, type=budget_type).aggregate(total=Coalesce(Sum('price'), 0))['total']
+                paragraph.dp_total = paragraph.p_total - paragraph.xp_total
+    
+                item_list = Item.objects.filter(paragraph=paragraph)
+                for item in item_list:
+                    budget = Budget.objects.get(business=business, year=year, item=item, type=budget_type)
+                    item.i_total = budget.price
+                    try:
+                        item.xi_total = Budget.objects.get(business=business, year=year-1, item=item, type=budget_type).price
+                    except :
+                        item.xi_total = 0
+                    item.di_total = item.i_total - item.xi_total
+
+                    context_list = []
+                    unit_price_list = []
+                    cnt_list = []
+                    months_list = []
+                    percent_list = []
+                    sub_price_list = []
+
+                    sub_columns = ['item','context','unit_price','cnt','months','percent','sub_price']
+                    context_list = budget.context.split("|")
+                    unit_price_list = budget.unit_price.split("|")
+                    cnt_list = budget.cnt.split("|")
+                    months_list = budget.months.split("|")
+                    if budget.percent is not None:
+                        percent_list = budget.percent.split("|")
+                    sub_price_list = budget.sub_price.split("|")
+                    row_list = []
+                    for idx, val in enumerate(context_list):
+                        r = []
+                        if val != None:
+                            r.append(budget.item.id)
+                            r.append(context_list[idx])
+                            r.append(unit_price_list[idx])
+                            r.append(cnt_list[idx])
+                            r.append(months_list[idx])
+                            if budget.percent is not None:
+                                r.append(percent_list[idx])
+                            else:
+                                r.append('')
+                            r.append(sub_price_list[idx])
+                        row_list.append(r)
+                        item.sub_data = [ dict(zip(sub_columns,row)) for row in row_list ]
+                paragraph.item_list = item_list
+            subsection.paragraph_list = paragraph_list
+
+    page_list = []
+    sub_row = []
+    for index, subsection in enumerate(subsection_list):
+        print(index, subsection)
+        sub_row.append(subsection)
+        if (budget_type in ['revenue', 'supplementary_revenue', 'supplementary_revenue']) and (index+1 in [3,9]):
+            page_list.append(sub_row)
+            print(index, sub_row)
+            sub_row = []
+        elif (budget_type in ['expenditure', 'supplementary_expenditure', 'supplementary_expenditure']) and (index+1 in [1,2,5,10]):
+            page_list.append(sub_row)
+            print(index, sub_row)
+            sub_row = []
+
+    return render(request, 'accounting/print_yearly_budget.html', {
+        'budget_type': budget_type, 'year': year, 'page_list': page_list,
+        'total': total, 'xtotal': xtotal, 'dtotal': dtotal
+        })
 
 @login_required(login_url='/')
 def regist_annual_budget(request):
@@ -1577,7 +1758,10 @@ def trial_balance(request):
             smonth = 3
             eyear = cyear+1
             emonth = 2
-            session_start_date = datetime.datetime.strptime(str(syear)+'-03-01', '%Y-%m-%d')
+            if cmonth < 3 :
+                session_start_date = datetime.datetime.strptime(str(cyear-1)+'-03-01', '%Y-%m-%d')
+            else :
+                session_start_date = datetime.datetime.strptime(str(cyear)+'-03-01', '%Y-%m-%d')
         else:
             syear = cyear
             smonth = 1
@@ -1594,6 +1778,8 @@ def trial_balance(request):
             end_date = datetime.datetime.strptime(str(year2)+'-'+str(month2+1)+'-01', '%Y-%m-%d')
         else:
             end_date = datetime.datetime.strptime(str(year2+1)+'-'+str(month2-11)+'-01', '%Y-%m-%d')
+
+        print(session_start_date, end_date)
 
         """
         item_list = Item.objects.filter(paragraph__subsection__institution = business.type3
@@ -1695,6 +1881,62 @@ def annual_trial_balance(request):
     })
 
 @login_required(login_url='/')
+def print_annual_trial_balance(request):
+    if request.method == "POST":
+        business = get_object_or_404(Business, pk=request.session['business'])
+        year = int(request.POST.get('year'))
+
+        if business.type3_id == "어린이집":
+            session_start_date = datetime.datetime.strptime(str(year)+'-03-01', '%Y-%m-%d')
+            session_end_date = datetime.datetime.strptime(str(year+1)+'-03-01', '%Y-%m-%d')
+        else:
+            session_start_date = datetime.datetime.strptime(str(year)+'-01-01', '%Y-%m-%d')
+            session_end_date = datetime.datetime.strptime(str(year+1)+'-01-01', '%Y-%m-%d')
+
+        item_list = Item.objects.filter(paragraph__subsection__institution = business.type3
+            ).annotate(total_settlement=Coalesce(Sum(Case(
+                When(transaction__business = business, then=Case(
+                When(transaction__Bkdate__gte = session_start_date, then=Case(
+                When(transaction__Bkdate__lt = session_end_date, then=Case(
+                When(transaction__Bkinput = 0, then='transaction__Bkoutput'),
+                default='transaction__Bkinput')))))))), 0)
+        ).order_by('paragraph__subsection__type', 'paragraph__subsection__code', 'paragraph__code', 'code').exclude(code=0)
+
+        ym_list = []
+        for x in range(0, 12):
+            date = session_start_date + relativedelta(months=x)
+            ym_list.append({'y': DateFormat(date).format("Y"), 'm': DateFormat(date).format("m")})
+
+        for idx, item in enumerate(item_list):
+            ms_list = []
+
+            for ym in ym_list:
+                start_date = datetime.datetime.strptime(ym['y']+'-'+ym['m']+'-01', '%Y-%m-%d')
+                end_date = start_date + relativedelta(months=1)
+
+                item_list3 = Item.objects.filter(pk=item.pk
+                ).annotate(income=Coalesce(Sum(Case(
+                    When(transaction__business = business, then=Case(
+                    When(transaction__Bkdate__gte = start_date, then=Case(
+                    When(transaction__Bkdate__lt = end_date, then=Case(
+                    When(transaction__Bkinput = 0, then='transaction__Bkoutput'),
+                    default='transaction__Bkinput')))))))), 0))
+
+                ms_list.append(item_list3[0].income)
+
+            item_list[idx].ms_list = ms_list
+
+        itemList = []
+        item_paginator = Paginator(item_list, 30)
+        for item_page in range(1, item_paginator.num_pages+1):
+            itemList.append(item_paginator.page(item_page))
+
+    return render(request, 'accounting/print_annual_trial_balance.html', {
+        'settlement_management': 'active', 'annual_trial_balance_page': 'active',
+        'ym_list': ym_list, 'year': year, 'item_list': item_list, 'itemList': itemList
+    })
+
+@login_required(login_url='/')
 def print_settlement(request):
     business = get_object_or_404(Business, pk=request.session['business'])
     today = datetime.datetime.now()
@@ -1708,7 +1950,23 @@ def print_settlement(request):
         month = 3
         if this_month < 3:
             year = this_year - 1
-    return render(request,'accounting/print_settlement.html', {'settlement_management': 'active', 'print_settlement_page': 'active', 'master_login': request.session['master_login'], 'business': business, 'year_range': range(this_year, 1999, -1), 'month_range': range(1, 13), 'year': year, 'month': month, 'year2': year2, 'month2': month2})
+    return render(request,'accounting/print_settlement.html', {'print_menu': 'active', 'print_settlement_page': 'active', 'master_login': request.session['master_login'], 'business': business, 'year_range': range(this_year, 1999, -1), 'month_range': range(1, 13), 'year': year, 'month': month, 'year2': year2, 'month2': month2})
+
+@login_required(login_url='/')
+def print_budget(request):
+    business = get_object_or_404(Business, pk=request.session['business'])
+    today = datetime.datetime.now()
+    this_year = int(DateFormat(today).format("Y"))
+    this_month = int(DateFormat(today).format("m"))
+    year = this_year
+    month = 1
+    year2 = this_year
+    month2 = this_month
+    if business.type3_id == "어린이집":
+        month = 3
+        if this_month < 3:
+            year = this_year - 1
+    return render(request,'accounting/print_budget.html', {'print_menu': 'active', 'print_budget_page': 'active', 'master_login': request.session['master_login'], 'business': business, 'year_range': range(this_year, 1999, -1), 'month_range': range(1, 13), 'year': year, 'month': month, 'year2': year2, 'month2': month2})
 
 @login_required(login_url='/')
 def print_budget_settlement(request, budget_type):
@@ -2377,7 +2635,7 @@ def monthly_print(request):
     month2 = this_month
     if this_month < 3:
         year = this_year - 1
-    return render(request,'accounting/monthly_print.html', {'accounting_management': 'active', 'monthly_print': 'active', 'master_login': request.session['master_login'], 'business': business, 'year_range': range(this_year, 1999, -1), 'month_range': range(1, 13), 'year': year, 'month': month, 'year2': year2, 'month2': month2})
+    return render(request,'accounting/monthly_print.html', {'print_menu': 'active', 'monthly_print': 'active', 'master_login': request.session['master_login'], 'business': business, 'year_range': range(this_year, 1999, -1), 'month_range': range(1, 13), 'year': year, 'month': month, 'year2': year2, 'month2': month2})
 
 @login_required(login_url='/')
 def monthly_print_all(request):
@@ -2618,6 +2876,80 @@ def monthly_print_all(request):
         'expenditure_voucher_list': expenditure_voucher_list,
         'revenue_returned_voucher_list': revenue_returned_voucher_list,
         'expenditure_returned_voucher_list': expenditure_returned_voucher_list
+    })
+
+@login_required(login_url='/')
+def print_trial_balance(request):
+    if request.method == "POST":
+        business = get_object_or_404(Business, pk=request.session['business'])
+        year = int(request.POST.get('year'))
+        month = int(request.POST.get('month'))
+        if request.POST.get('year2'):
+            year2 = int(request.POST.get('year2'))
+            month2 = int(request.POST.get('month2'))
+        else:
+            year2 = year
+            month2 = month
+        year3 = year2
+        month3 = month2+1
+        if month3 > 12 :
+            year3 = year3 + 1
+            month3 = 1
+        if business.type3_id == "어린이집":
+            if month > 2 :
+                session_start_date = datetime.datetime.strptime(str(year)+'-03-01', '%Y-%m-%d')
+            else :
+                session_start_date = datetime.datetime.strptime(str(year-1)+'-03-01', '%Y-%m-%d')
+        else:
+            session_start_date = datetime.datetime.strptime(str(year)+'-01-01', '%Y-%m-%d')
+
+        start_date = datetime.datetime.strptime(str(year)+'-'+str(month)+'-01', '%Y-%m-%d')
+        if month2 <= 11:
+            end_date = datetime.datetime.strptime(str(year2)+'-'+str(month2+1)+'-01', '%Y-%m-%d')
+        else:
+            end_date = datetime.datetime.strptime(str(year2+1)+'-'+str(month2-11)+'-01', '%Y-%m-%d')
+
+        item_list = Item.objects.filter(paragraph__subsection__institution = business.type3
+            ).annotate(cumulative_income=Coalesce(Sum(Case(
+                When(transaction__business = business, then=Case(
+                When(transaction__Bkdate__gte = session_start_date, then=Case(
+                When(transaction__Bkdate__lt = end_date, then=Case(
+                When(transaction__Bkinput__isnull = False, then='transaction__Bkinput'))))))))), 0)
+            ).order_by('paragraph__subsection__type', 'paragraph__subsection__code', 'paragraph__code', 'code').exclude(code=0)
+
+        for idx, item in enumerate(item_list):
+            item_list2 = Item.objects.filter(pk=item.pk
+            ).annotate(income=Coalesce(Sum(Case(
+                When(transaction__business = business, then=Case(
+                When(transaction__Bkdate__gte = start_date, then=Case(
+                When(transaction__Bkdate__lt = end_date, then=Case(
+                When(transaction__Bkinput__isnull = False, then='transaction__Bkinput'))))))))), 0))
+            item_list3 = Item.objects.filter(pk=item.pk
+            ).annotate(expenditure=Coalesce(Sum(Case(
+                When(transaction__business = business, then=Case(
+                When(transaction__Bkdate__gte = start_date, then=Case(
+                When(transaction__Bkdate__lt = end_date, then=Case(
+                When(transaction__Bkoutput__isnull = False, then='transaction__Bkoutput'))))))))), 0))
+            item_list4 = Item.objects.filter(pk=item.pk
+            ).annotate(cumulative_expenditure=Coalesce(Sum(Case(
+                When(transaction__business = business, then=Case(
+                When(transaction__Bkdate__gte = session_start_date, then=Case(
+                When(transaction__Bkdate__lt = end_date, then=Case(
+                When(transaction__Bkoutput__isnull = False, then='transaction__Bkoutput'))))))))), 0))
+
+            item_list[idx].income = item_list2[0].income
+            item_list[idx].expenditure = item_list3[0].expenditure
+            item_list[idx].cumulative_expenditure = item_list4[0].cumulative_expenditure
+
+        itemList = []
+        item_paginator = Paginator(item_list, 45)
+        for item_page in range(1, item_paginator.num_pages+1):
+            itemList.append(item_paginator.page(item_page))
+
+    return render(request, 'accounting/print_trial_balance.html', {
+        'settlement_management': 'active', 'trial_balance_page': 'active',
+        'year': year, 'month': month, 'year2': year2, 'month2': month2,
+        'item_list': item_list, 'itemList' : itemList
     })
 
 @login_required(login_url='/')

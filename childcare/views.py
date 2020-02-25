@@ -22,6 +22,7 @@ def monthly_report(request):
     report_y = report_date.strftime("%Y")
     report_m = report_date.strftime("%m")
     selected_year = request.GET.get('year', report_date.strftime("%Y"))
+    request_y = str(selected_year) if int(report_m) > 2 else str(int(selected_year)+1)
     operation = "acRptMonthSum"
 
     if request.method == "GET":
@@ -45,7 +46,7 @@ def monthly_report(request):
             total_sum=Coalesce(
                 Sum(Case(
                     When(transaction__business = business, then=Case(
-                        When(transaction__Bkdate__year = selected_year, then=Case(
+                        When(transaction__Bkdate__year = request_y, then=Case(
                             When(transaction__Bkdate__month = report_m, then=Case(
                                 When(
                                     transaction__Bkoutput=0,
@@ -54,7 +55,7 @@ def monthly_report(request):
                                 default='transaction__Bkoutput')))))))),0),
             count=Count(Case(
                 When(transaction__business = business, then=Case(
-                    When(transaction__Bkdate__year = selected_year, then=Case(
+                    When(transaction__Bkdate__year = request_y, then=Case(
                         When(transaction__Bkdate__month = report_m, then='id')))))))
         ).exclude(code=0).exclude(total_sum=0).exclude(count=0).order_by(
             'paragraph__subsection__type',
@@ -66,7 +67,9 @@ def monthly_report(request):
 
         body =  "<S_AUTH_KEY>"+business.s_auth_key+"</S_AUTH_KEY>\n" + \
                 "<MON>"+today.strftime("%Y%m")+"</MON>\n"
+        print("aaa")
         for item in item_list:
+            print(item)
             GB = "1" if item.paragraph.subsection.type=="수입" else "2"
             CD = str(item.paragraph.subsection.code)+str(item.paragraph.code)+str(item.code)
             body += "<SR>\n"
@@ -75,7 +78,7 @@ def monthly_report(request):
             body += "   <AMT>"+str(item.total_sum)+"</AMT>\n"
             body += "   <CNT>"+str(item.count)+"</CNT>\n"
             body += "</SR>\n"
-        response = request_childcare(business, operation, selected_year, report_m, body)
+        response = request_childcare(business, operation, request_y, report_m, body)
         return response
 
     return render(request, 'childcare/monthly_report.html', {
