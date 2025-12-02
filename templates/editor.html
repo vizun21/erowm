@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>WebHWP 문서 편집</title>
+<script src="/static/webhwp/webhwp.js"></script>
+<style>
+body { font-family: Arial; margin: 0; padding: 0; }
+#toolbar { padding: 10px; background: #f4f4f4; border-bottom: 1px solid #ddd; }
+#editor { width: 100%; height: calc(100vh - 60px); }
+button { margin-right: 10px; }
+</style>
+</head>
+<body>
+<div id="toolbar">
+<button onclick="saveHwpx()">서버저장(HWPX)</button>
+<button onclick="previewHtml()">HTML 미리보기</button>
+<button onclick="downloadPdf()">PDF 다운로드</button>
+</div>
+
+
+<div id="editor"></div>
+
+
+<script>
+let webHwp = new WebHwpEditor('#editor');
+
+
+async function saveHwpx() {
+const blob = await webHwp.exportHwpx();
+uploadToServer(blob, 'document.hwpx');
+}
+
+
+async function previewHtml() {
+const blob = await webHwp.exportHtml();
+uploadToServer(blob, 'document.html');
+}
+
+
+async function downloadPdf() {
+const blob = await webHwp.exportPdf();
+const url = URL.createObjectURL(blob);
+const a = document.createElement('a');
+a.href = url;
+a.download = 'document.pdf';
+a.click();
+}
+
+
+function uploadToServer(blob, filename) {
+const fd = new FormData();
+fd.append('file', blob, filename);
+
+
+fetch('/paydoc/upload/', {
+method: 'POST',
+body: fd
+})
+.then(r => r.json())
+.then(res => {
+if (res.status === 'OK') {
+window.open(res.url);
+}
+});
+}
+</script>
+</body>
+</html>
