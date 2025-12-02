@@ -28,6 +28,11 @@ from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 import json
 import requests
 
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+import os
+from django.conf import settings
+
 # Create your views here.
 
 ACCOUNTANT = 1
@@ -89,6 +94,20 @@ def signup(request):
 
 def signup_done(request):
     return render(request, "registration/signup_done.html")
+
+@csrf_exempt
+def upload_preview(request):
+    if request.method == 'POST' and request.FILES.get('file'):
+        upload_dir = os.path.join(settings.MEDIA_ROOT, 'paydoc_preview')
+        os.makedirs(upload_dir, exist_ok=True)
+        f = request.FILES['file']
+        filename = f.name  # e.g. '12345.html'
+        save_path = os.path.join(upload_dir, filename)
+        with open(save_path, 'wb') as dest:
+            for chunk in f.chunks():
+                dest.write(chunk)
+        return JsonResponse({ 'status': 'OK', 'url': settings.MEDIA_URL + 'paydoc_preview/' + filename })
+    return JsonResponse({ 'status': 'ERROR' }, status=400)
 
 @login_required(login_url='/')
 def user_delete(request):
