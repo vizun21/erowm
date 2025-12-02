@@ -16,6 +16,7 @@ Including another URLconf
 from django.conf.urls import url, include
 from django.contrib import admin
 from django.urls import path
+from . import views
 from django.contrib.auth import views as auth_views
 from accounting import views
 from django.conf import settings
@@ -29,4 +30,7 @@ urlpatterns = [
     url(r'^accounts/signup_done/$', views.signup_done, name='signup_done'),
     url(r'', include('accounting.urls')),
     url(r'childcare/', include('childcare.urls')),
+    path('paydoc/editor/', views.editor_page, name='editor_page'),
+    path('paydoc/upload/', views.upload_hwpx, name='upload_hwpx'),
+    path('paydoc/preview/<str:filename>/', views.preview_page, name='preview_page'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
