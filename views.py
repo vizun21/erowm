@@ -95,20 +95,58 @@ def signup(request):
 def signup_done(request):
     return render(request, "registration/signup_done.html")
 
+def editor_page(request):
+return render(request, 'editor.html')
+
+
+def preview_page(request, filename):
+return render(request, 'preview.html', {
+'preview_file': f"/media/hwpx_preview/{filename}"
+})
+
+import os
+import uuid
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.conf import settings
+
 @csrf_exempt
 def upload_preview(request):
-    if request.method == 'POST' and request.FILES.get('file'):
-        upload_dir = os.path.join(settings.MEDIA_ROOT, 'paydoc_preview')
-        os.makedirs(upload_dir, exist_ok=True)
-        f = request.FILES['file']
-        filename = f.name  # e.g. '12345.html'
-        save_path = os.path.join(upload_dir, filename)
-        with open(save_path, 'wb') as dest:
-            for chunk in f.chunks():
-                dest.write(chunk)
-        return JsonResponse({ 'status': 'OK', 'url': settings.MEDIA_URL + 'paydoc_preview/' + filename })
-    return JsonResponse({ 'status': 'ERROR' }, status=400)
+    if request.method != 'POST' or 'file' not in request.FILES:
+        return JsonResponse({ 'status': 'ERROR', 'message': 'Invalid request' }, status=400)
 
+    f = request.FILES['file']
+
+    # 🔒 1) 허용 확장자 제한 (HTML, HWPX)
+    allowed_ext = ['.html', '.htm', '.hwpx']
+    _, ext = os.path.splitext(f.name.lower())
+
+    if ext not in allowed_ext:
+        return JsonResponse({ 'status': 'ERROR', 'message': 'Invalid file type' }, status=400)
+
+    # 📁 2) 저장 디렉토리 생성
+    upload_dir = os.path.join(settings.MEDIA_ROOT, 'paydoc_preview')
+    os.makedirs(upload_dir, exist_ok=True)
+
+    # 🆔 3) 안전한 파일명 생성
+    #    예: preview_20250203_8fd21be33.html
+    new_filename = f"preview_{uuid.uuid4().hex}{ext}"
+
+    save_path = os.path.join(upload_dir, new_filename)
+
+    # 💾 4) 파일 저장
+    with open(save_path, 'wb') as dest:
+        for chunk in f.chunks():
+            dest.write(chunk)
+
+    # 🔗 5) URL 생성
+    file_url = settings.MEDIA_URL + 'paydoc_preview/' + new_filename
+
+    return JsonResponse({
+        'status': 'OK',
+        'url': file_url,
+        'filename': new_filename
+    })
 @login_required(login_url='/')
 def user_delete(request):
     if request.user.profile.level_id < LOCAL:
