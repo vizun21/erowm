@@ -243,19 +243,19 @@
 			<li class="page-item"><p class="page-link">...</p></li>
 				{% endif %}
 				{% if data.number|add:"-5" > 0 %}
-			<li class="page-item"><a class="page-link" href="{% url 'transaction_history' %}?page={{ data.number|add:"-5" }}&page2={{ page2 }}&year={{ year }}&month={{ month }}&=acctid{{ acctid }}">{{ data.number|add:"-5" }}</a></li>
+			<li class="page-item"><a class="page-link" href="{% url 'transaction_history' %}?page={{ data.number|add:"-5" }}&page2={{ page2 }}&year={{ year }}&month={{ month }}&acctid={{ acctid }}">{{ data.number|add:"-5" }}</a></li>
 				{% endif %}
 				{% if data.number|add:"-4" > 0 %}
-			<li class="page-item"><a class="page-link" href="{% url 'transaction_history' %}?page={{ data.number|add:"-4" }}&page2={{ page2 }}&year={{ year }}&month={{ month }}&=acctid{{ acctid }}">{{ data.number|add:"-4" }}</a></li>
+			<li class="page-item"><a class="page-link" href="{% url 'transaction_history' %}?page={{ data.number|add:"-4" }}&page2={{ page2 }}&year={{ year }}&month={{ month }}&acctid={{ acctid }}">{{ data.number|add:"-4" }}</a></li>
 				{% endif %}
 				{% if data.number|add:"-3" > 0 %}
-			<li class="page-item"><a class="page-link" href="{% url 'transaction_history' %}?page={{ data.number|add:"-3" }}&page2={{ page2 }}&year={{ year }}&month={{ month }}&=acctid{{ acctid }}">{{ data.number|add:"-3" }}</a></li>
+			<li class="page-item"><a class="page-link" href="{% url 'transaction_history' %}?page={{ data.number|add:"-3" }}&page2={{ page2 }}&year={{ year }}&month={{ month }}&acctid={{ acctid }}">{{ data.number|add:"-3" }}</a></li>
 				{% endif %}
 				{% if data.number|add:"-2" > 0 %}
-			<li class="page-item"><a class="page-link" href="{% url 'transaction_history' %}?page={{ data.number|add:"-2" }}&page2={{ page2 }}&year={{ year }}&month={{ month }}&=acctid{{ acctid }}">{{ data.number|add:"-2" }}</a></li>
+			<li class="page-item"><a class="page-link" href="{% url 'transaction_history' %}?page={{ data.number|add:"-2" }}&page2={{ page2 }}&year={{ year }}&month={{ month }}&acctid={{ acctid }}">{{ data.number|add:"-2" }}</a></li>
 				{% endif %}
 				{% if data.number|add:"-1" > 0 %}
-			<li class="page-item"><a class="page-link" href="{% url 'transaction_history' %}?page={{ data.number|add:"-1" }}&page2={{ page2 }}&year={{ year }}&month={{ month }}&=acctid{{ acctid }}">{{ data.number|add:"-1" }}</a></li>
+			<li class="page-item"><a class="page-link" href="{% url 'transaction_history' %}?page={{ data.number|add:"-1" }}&page2={{ page2 }}&year={{ year }}&month={{ month }}&acctid={{ acctid }}">{{ data.number|add:"-1" }}</a></li>
 				{% endif %}
 			{% endif %}
 			<li class="page-item"><a class="page-link bg-primary text-light" href="{% url 'transaction_history' %}?page={{ data.number }}&page2={{ page2 }}&year={{ year }}&month={{ month }}&acctid={{ acctid }}">{{ data.number }}</a></li>

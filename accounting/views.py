@@ -779,14 +779,14 @@ def transaction_history(request):
     except PageNotAnInteger:
         data = paginator.page(1)
     except EmptyPage:
-        data = Paginator.page(paginator.num_pages)
+        data = paginator.page(paginator.num_pages)  # Bug3 fix: Paginator → paginator
 
     try:
         data2 = paginator2.page(page2)
     except PageNotAnInteger:
         data2 = paginator2.page(1)
     except EmptyPage:
-        data2 = Paginator.page(paginator2.num_pages)
+        data2 = paginator2.page(paginator2.num_pages)  # Bug3 fix: Paginator → paginator2
     return render(request, 'accounting/transaction_history.html', {
         'selected_check_list': selected_check_list, 'total_input': total_input, 'total_output': total_output, 'jango': jango, 'premonth_transfer_price': premonth_transfer_price, 'year': int(year), 'month': int(month), 'year_range': range(int(DateFormat(today).format("Y")), 1999, -1), 'month_range': range(1,13), 'acctid': int(acctid), 'page': page, 'page2': page2, 'acct_list': acct_list, 'selected_subdivision_list': selected_subdivision_list, 'selected_input_subdivision_list': selected_input_subdivision_list, 'relative_item_list': relative_item_list, 'input_subsections': input_subsections, 'selected_subsection_list': selected_subsection_list, 'selected_item_list': selected_item_list, 'data': data, 'data2': data2, 'input_items': input_items, 'output_items': output_items, 'subdivision_list': subdivision_list, 'business': business, 'accounting_management': 'active', 'transaction_history_page': 'active', 'master_login': request.session['master_login'],
     })
@@ -829,9 +829,11 @@ def regist_transaction(request):
     if request.method == "POST":
         for check in tr_check_list:
             Bkid=tr_list[int(check)]
-            tblbank_tr = TBLBANK.objects.get(Bkid=Bkid)
+            # Bug4 fix: get() → filter().first() (Bkid 중복 시 MultipleObjectsReturned 방어)
+            tblbank_tr = TBLBANK.objects.filter(Bkid=Bkid, Bkdivision=1).first()
+            if tblbank_tr is None:
+                tblbank_tr = TBLBANK.objects.filter(Bkid=Bkid).first()
             Bkdivision = 1
-            #Bkdivision = Transaction.objects.filter(Bkid=Bkid).filter(Bkdivision__gt=0).count() + 1
             Bkdate = Bkdate_list[int(check)]
             start_date = datetime.datetime.strptime(Bkdate[:8]+'01', "%Y-%m-%d")
 
@@ -843,7 +845,10 @@ def regist_transaction(request):
                 carryover_tr = Transaction.objects.filter(business=business, Bkdate=start_date).get(Bkdivision=0)
             except Transaction.DoesNotExist:
                 #--전월이월금 없는 경우 주계좌의 이전달 마지막 내역을 전월이월금으로 등록
-                main_acct = Account.objects.get(business=business, main=True)
+                # Bug5 fix: get() → filter().first() (주계좌 복수 등록 시 MultipleObjectsReturned 방어)
+                main_acct = Account.objects.filter(business=business, main=True).first()
+                if main_acct is None:
+                    return HttpResponse("<script>alert('주계좌가 등록되지 않았습니다. 계좌를 먼저 등록해주세요.');history.back();</script>")
                 last_tr = TBLBANK.objects.filter(Bkacctno=main_acct.account_number, Bkdate__gte=a_month_ago).filter(Bkdate__lt=start_date).order_by('Bkdate', 'Bkid').last()
                 if last_tr == None:
                     return HttpResponse("<script>alert('주계좌의 전월 거래내역이 없습니다. 전월거래내역이 있는 계좌를 주계좌로 변경하세요.');history.back();</script>")
@@ -915,7 +920,10 @@ def regist_transaction(request):
                     update.Bkjango = update.Bkjango - transaction.Bkoutput
                 update.save()
 
-            tr = TBLBANK.objects.get(Bkid=Bkid)
+            # Bug4 fix: get() → filter().first()
+            tr = TBLBANK.objects.filter(Bkid=Bkid, Bkdivision=1).first() or TBLBANK.objects.filter(Bkid=Bkid).first()
+            if tr is None:
+                continue
             tr.sub_Bkjukyo=Bkjukyo
             tr.item = item
             tr.subdivision = subdivision
@@ -1030,7 +1038,7 @@ def paragraph_create(request):
 def paragraph_edit(request, pk):
     paragraph = Paragraph.objects.get(pk=pk)
     if request.method == "POST":
-        form = ParagraphForm(request.POST, instance=paragaph)
+        form = ParagraphForm(request.POST, instance=paragraph)  # Bug1 fix: paragaph → paragraph
         if form.is_valid():
             form.save()
             return redirect('spi_list')
@@ -2574,11 +2582,13 @@ def edit_transaction(request):
     transaction = get_object_or_404(Transaction, pk=pk)
     transactionform = TransactionEditForm(request.POST, instance=transaction)
 
+    # Bug2 fix: Bkdate 미정의 변수 NameError → transaction 객체에서 가져옴
+    Bkdate = str(transaction.Bkdate)
     try:
-        close = Deadline.objects.get(business=business,year=Bkdate[:4],month=Bkdate[5:7])
+        close = Deadline.objects.get(business=business, year=Bkdate[:4], month=str(transaction.Bkdate.month).zfill(2))
         if close.regdatetime:
             return HttpResponse("<script>alert('해당월은 마감완료되었습니다.');history.back();</script>")
-    except:
+    except Deadline.DoesNotExist:
         pass
     
     #금액수정불가, 관항목만 수정가능
@@ -3603,6 +3613,11 @@ def tr_syn(request):
     update_list = Transaction.objects.filter(business=business, Bkdate__year = year, Bkdate__month = month).order_by('Bkdate', 'id')
     
     first_tr = update_list.first()
+    # Bug7 fix: first_tr이 None일 경우 AttributeError 방어
+    if first_tr is None:
+        response = redirect('transaction_history')
+        response['Location'] += '?page='+str(page)+'&page2='+str(page2)+'&year='+str(year)+'&month='+str(month)+'&acctid='+str(acctid)
+        return response
     jango = first_tr.Bkjango
 
     for idx, update in enumerate(update_list):
