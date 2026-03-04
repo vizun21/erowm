@@ -232,16 +232,18 @@ function calc(index) {
 	var len = document.getElementsByName("sub-tr-"+index).length;
 
 	for(var i = startNum+1; i <= startNum+len; i++) {
-		if(f.budget_percent[i].value) {
-			console.log('percent : '+f.budget_percent[i].value);
-			sub_price = f.budget_unit_price[i].value * f.budget_cnt[i].value * f.budget_months[i].value * (f.budget_percent[i].value * 0.01);
+		var unit_price = parseInt(f.budget_unit_price[i].value) || 0;
+		var cnt       = parseInt(f.budget_cnt[i].value)        || 0;
+		var months    = parseInt(f.budget_months[i].value)     || 0;
+		var percent   = parseInt(f.budget_percent[i].value)    || 0;
+		if(percent) {
+			sub_price = Math.round(unit_price * cnt * months * (percent / 100));
 		}
 		else {
-			console.log('percent : '+f.budget_percent[i].value);
-			sub_price = f.budget_unit_price[i].value * f.budget_cnt[i].value * f.budget_months[i].value;
+			sub_price = unit_price * cnt * months;
 		}
-		f.budget_sub_price[i].value = sub_price
-		budget_price += sub_price
+		f.budget_sub_price[i].value = sub_price;
+		budget_price += sub_price;
 	}
 	f.budget_price[index].value = budget_price;
 }
