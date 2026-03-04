@@ -93,6 +93,11 @@ urlpatterns = [
     url(r'^upload/transaction2/$', views.upload_transaction2, name='upload_transaction2'),
     url(r'^upload/voucher/$', views.upload_voucher, name='upload_voucher'),
 
+    # 관항목 엑셀 업로드
+    url(r'^popup/upload/spi/$', views.popup_upload_spi, name='popup_upload_spi'),
+    url(r'^upload/spi/$', views.upload_spi, name='upload_spi'),
+    url(r'^download/spi/template/$', views.download_spi_template, name='download_spi_template'),
+
     url(r'^close/list/$', views.close_list, name='close_list'),
     url(r'^regist/close/$', views.regist_close, name='regist_close'),
     url(r'^undo/close/$', views.undo_close, name='undo_close'),

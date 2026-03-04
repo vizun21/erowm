@@ -3112,6 +3112,14 @@ def popup_upload(request):
     type = request.GET.get('type','')
     return render(request, 'accounting/popup_upload.html', {'type': type})
 
+@login_required(login_url='/')
+def popup_upload_spi(request):
+    """관항목 엑셀 업로드 팝업 뷰"""
+    institution_list = Business_type.objects.all()
+    return render(request, 'accounting/popup_upload_spi.html', {
+        'institution_list': institution_list,
+    })
+
 import openpyxl
 from openpyxl import Workbook, load_workbook
 
@@ -3266,6 +3274,246 @@ def upload_transaction2(request):
 
 
 from django.db import transaction
+
+# ──────────────────────────────────────────────────────────────
+# 관항목 엑셀 업로드
+# ──────────────────────────────────────────────────────────────
+# 엑셀 컬럼 순서 (2행부터 데이터):
+# A: 년도  B: 사업종류  C: 구분(수입/지출)  D: 관코드  E: 관명
+# F: 항코드  G: 항명  H: 목코드  I: 목명  J: 내역
+# ──────────────────────────────────────────────────────────────
+@login_required(login_url='/')
+def upload_spi(request):
+    if request.method != 'POST':
+        return HttpResponse("<script>alert('잘못된 접근입니다.');history.back();</script>")
+
+    upfile = request.FILES.get('file')
+    if not upfile:
+        return HttpResponse("<script>alert('파일을 선택해주세요.');history.back();</script>")
+
+    ext = upfile.name.rsplit('.', 1)[-1].lower()
+    if ext not in ('xls', 'xlsx'):
+        return HttpResponse("<script>alert('.xls 또는 .xlsx 파일만 업로드 가능합니다.');history.back();</script>")
+
+    try:
+        wb = load_workbook(filename=upfile, read_only=True, data_only=True)
+    except Exception as e:
+        return HttpResponse("<script>alert('엑셀 파일을 읽을 수 없습니다: {}');history.back();</script>".format(str(e)))
+
+    sheet = wb.worksheets[0]
+
+    success_count = 0
+    skip_count = 0
+    error_rows = []
+
+    for row_idx, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
+        # 빈 행 건너뜀
+        if not any(row):
+            continue
+
+        try:
+            year        = str(row[0]).strip() if row[0] else ''
+            institution_name = str(row[1]).strip() if row[1] else ''
+            type_val    = str(row[2]).strip() if row[2] else ''
+            ss_code     = int(row[3]) if row[3] is not None else None   # 관코드
+            ss_context  = str(row[4]).strip() if row[4] else ''          # 관명
+            p_code      = int(row[5]) if row[5] is not None else None   # 항코드
+            p_context   = str(row[6]).strip() if row[6] else ''          # 항명
+            item_code   = int(row[7]) if row[7] is not None else None   # 목코드
+            item_context= str(row[8]).strip() if row[8] else ''          # 목명
+            item_text   = str(row[9]).strip() if row[9] else ''          # 내역
+        except (ValueError, TypeError) as e:
+            error_rows.append("{}행: 형식 오류 ({})".format(row_idx, str(e)))
+            skip_count += 1
+            continue
+
+        # 필수값 검사
+        if not year or not institution_name or not type_val or ss_code is None or not ss_context:
+            error_rows.append("{}행: 필수값(년도/사업종류/구분/관코드/관명) 누락".format(row_idx))
+            skip_count += 1
+            continue
+
+        if type_val not in ('수입', '지출'):
+            error_rows.append("{}행: 구분은 '수입' 또는 '지출'이어야 합니다 (입력값: {})".format(row_idx, type_val))
+            skip_count += 1
+            continue
+
+        try:
+            institution = Business_type.objects.get(name=institution_name)
+        except Business_type.DoesNotExist:
+            error_rows.append("{}행: 사업종류 '{}' 없음".format(row_idx, institution_name))
+            skip_count += 1
+            continue
+
+        # ── 관(Subsection) get_or_create ──
+        try:
+            subsection, ss_created = Subsection.objects.get_or_create(
+                year=year,
+                institution=institution,
+                type=type_val,
+                code=ss_code,
+                defaults={'context': ss_context, 'enable': '1'},
+            )
+            if not ss_created and subsection.context != ss_context:
+                subsection.context = ss_context
+                subsection.save()
+        except Exception as e:
+            error_rows.append("{}행: 관 저장 오류 ({})".format(row_idx, str(e)))
+            skip_count += 1
+            continue
+
+        # 항/목 정보가 없으면 관만 처리
+        if p_code is None or not p_context:
+            success_count += 1
+            continue
+
+        # ── 항(Paragraph) get_or_create ──
+        try:
+            paragraph, p_created = Paragraph.objects.get_or_create(
+                subsection=subsection,
+                code=p_code,
+                defaults={'year': year, 'context': p_context, 'enable': '1'},
+            )
+            if not p_created and paragraph.context != p_context:
+                paragraph.context = p_context
+                paragraph.save()
+        except Exception as e:
+            error_rows.append("{}행: 항 저장 오류 ({})".format(row_idx, str(e)))
+            skip_count += 1
+            continue
+
+        # 목 정보가 없으면 항까지만 처리
+        if item_code is None or not item_context:
+            success_count += 1
+            continue
+
+        # ── 목(Item) get_or_create ──
+        try:
+            item, i_created = Item.objects.get_or_create(
+                paragraph=paragraph,
+                code=item_code,
+                defaults={'year': year, 'context': item_context, 'text': item_text, 'enable': '1'},
+            )
+            if not i_created:
+                updated = False
+                if item.context != item_context:
+                    item.context = item_context
+                    updated = True
+                if item.text != item_text:
+                    item.text = item_text
+                    updated = True
+                if updated:
+                    item.save()
+        except Exception as e:
+            error_rows.append("{}행: 목 저장 오류 ({})".format(row_idx, str(e)))
+            skip_count += 1
+            continue
+
+        success_count += 1
+
+    wb.close()
+
+    # 결과 메시지 생성
+    msg_lines = ["총 {}건 처리 완료".format(success_count)]
+    if skip_count:
+        msg_lines.append("{}건 건너뜀(오류)".format(skip_count))
+    if error_rows:
+        detail = "\\n".join(error_rows[:10])
+        if len(error_rows) > 10:
+            detail += "\\n... 외 {}건".format(len(error_rows) - 10)
+        msg_lines.append("오류 상세:\\n" + detail)
+
+    msg = "\\n".join(msg_lines)
+    return HttpResponse(
+        "<script>alert('{}');window.close();window.opener&&window.opener.location.reload();</script>".format(msg)
+    )
+
+
+@login_required(login_url='/')
+def download_spi_template(request):
+    """관항목 엑셀 양식 다운로드"""
+    from django.http import HttpResponse as DjangoResponse
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = '관항목'
+
+    # 헤더 스타일
+    header_font = Font(bold=True, color='FFFFFF')
+    header_fill = PatternFill(start_color='4472C4', end_color='4472C4', fill_type='solid')
+    center_align = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    thin_border = Border(
+        left=Side(style='thin'), right=Side(style='thin'),
+        top=Side(style='thin'), bottom=Side(style='thin')
+    )
+
+    headers = [
+        ('A1', '년도', 8),
+        ('B1', '사업종류', 14),
+        ('C1', '구분\n(수입/지출)', 12),
+        ('D1', '관코드', 8),
+        ('E1', '관명', 16),
+        ('F1', '항코드', 8),
+        ('G1', '항명', 16),
+        ('H1', '목코드', 8),
+        ('I1', '목명', 16),
+        ('J1', '내역', 30),
+    ]
+
+    for cell_ref, text, col_width in headers:
+        cell = ws[cell_ref]
+        cell.value = text
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = center_align
+        cell.border = thin_border
+        col_letter = cell_ref[0]
+        ws.column_dimensions[col_letter].width = col_width
+
+    ws.row_dimensions[1].height = 30
+
+    # 샘플 데이터
+    samples = [
+        ('2025', '어린이집', '수입', 1, '보조금수입', 1, '국가보조금', 1, '기본보육료', '만0-2세 기본보육료'),
+        ('2025', '어린이집', '수입', 1, '보조금수입', 1, '국가보조금', 2, '연장보육료', '만0-2세 연장보육료'),
+        ('2025', '어린이집', '수입', 2, '부모부담수입', 1, '보육료수입', 1, '보육료', '부모부담 보육료'),
+        ('2025', '어린이집', '지출', 1, '인건비', 1, '급여', 1, '본봉', '원장/교사 기본급'),
+        ('2025', '어린이집', '지출', 1, '인건비', 1, '급여', 2, '수당', '제 수당'),
+    ]
+
+    note_fill = PatternFill(start_color='FFF2CC', end_color='FFF2CC', fill_type='solid')
+    for row_idx, row_data in enumerate(samples, start=2):
+        for col_idx, value in enumerate(row_data, start=1):
+            cell = ws.cell(row=row_idx, column=col_idx, value=value)
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            cell.border = thin_border
+            cell.fill = note_fill
+
+    # 안내 메모 행
+    note_row = len(samples) + 3
+    ws.cell(row=note_row, column=1, value='※ 주의사항').font = Font(bold=True, color='FF0000')
+    notes = [
+        '- 1행(헤더)은 수정하지 마세요.',
+        '- 년도: 4자리 숫자 (예: 2025)',
+        '- 사업종류: 시스템에 등록된 사업종류명과 정확히 일치해야 합니다.',
+        '- 구분: "수입" 또는 "지출" 중 하나만 입력하세요.',
+        '- 관코드/항코드/목코드: 숫자만 입력하세요.',
+        '- 항/목 정보는 선택사항입니다. 관까지만 입력해도 됩니다.',
+        '- 이미 등록된 항목은 덮어쓰기(업데이트)됩니다.',
+    ]
+    for i, note in enumerate(notes):
+        ws.cell(row=note_row + 1 + i, column=1, value=note)
+        ws.merge_cells('A{}:J{}'.format(note_row + 1 + i, note_row + 1 + i))
+
+    response = DjangoResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = 'attachment; filename="관항목_업로드양식.xlsx"'
+    wb.save(response)
+    return response
+
 
 @login_required(login_url='/')
 def upload_voucher(request):

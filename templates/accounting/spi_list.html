@@ -62,6 +62,12 @@
 		<a class="btn btn-outline-primary" href="{% url 'subsection_create' %}">관등록</a>
 		<a class="btn btn-outline-primary" href="{% url 'paragraph_create' %}">항등록</a>
 		<a class="btn btn-outline-primary" href="{% url 'item_create' %}">목등록</a>
+		<a class="btn btn-outline-success ml-2"
+		   href="{% url 'popup_upload_spi' %}"
+		   onclick="window.open(this.href,'spi_upload','width=580,height=480,scrollbars=yes'); return false;">
+		   📤 엑셀 업로드
+		</a>
+		<a class="btn btn-outline-secondary ml-1" href="{% url 'download_spi_template' %}">📥 양식 다운로드</a>
 	</div>
 </div>
 {% endblock %}

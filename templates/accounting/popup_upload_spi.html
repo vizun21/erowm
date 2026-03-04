@@ -1,0 +1,70 @@
+{% extends 'accounting/popup_base.html' %}
+
+{% block content %}
+<div class="my-3">
+  <h5 class="mb-3">관항목 엑셀 업로드</h5>
+
+  <div class="alert alert-info py-2 small mb-3">
+    <strong>엑셀 파일 컬럼 순서 (2행부터 데이터 입력)</strong><br>
+    A: 년도 &nbsp;|&nbsp; B: 사업종류 &nbsp;|&nbsp; C: 구분(수입/지출) &nbsp;|&nbsp;
+    D: 관코드 &nbsp;|&nbsp; E: 관명 &nbsp;|&nbsp;
+    F: 항코드 &nbsp;|&nbsp; G: 항명 &nbsp;|&nbsp;
+    H: 목코드 &nbsp;|&nbsp; I: 목명 &nbsp;|&nbsp;
+    J: 내역<br>
+    <span class="text-muted">※ 항/목 정보는 선택사항입니다. 관까지만 입력해도 됩니다.</span><br>
+    <span class="text-muted">※ 이미 등록된 항목은 내용이 업데이트됩니다.</span>
+  </div>
+
+  <div class="mb-3">
+    <a href="{% url 'download_spi_template' %}" class="btn btn-sm btn-outline-secondary">
+      📥 엑셀 양식 다운로드
+    </a>
+  </div>
+
+  <form id="uploadForm" method="POST" action="{% url 'upload_spi' %}" enctype="multipart/form-data">
+    {% csrf_token %}
+    <div class="form-group">
+      <label class="font-weight-bold">엑셀 파일 선택 <span class="text-danger">*</span></label>
+      <input type="file" name="file" id="fileInput" accept=".xls,.xlsx"
+             class="form-control-file" required>
+      <small class="form-text text-muted">.xls, .xlsx 파일만 허용됩니다.</small>
+    </div>
+
+    <div id="fileInfo" class="alert alert-secondary py-1 small d-none"></div>
+
+    <div class="text-center mt-3">
+      <button type="submit" id="submitBtn" class="btn btn-primary">
+        업로드
+      </button>
+      <button type="button" class="btn btn-secondary ml-2" onclick="window.close()">
+        닫기
+      </button>
+    </div>
+  </form>
+</div>
+
+<style>
+  .alert { font-size: 0.85rem; }
+  body { padding: 15px; }
+</style>
+
+<script>
+  document.getElementById('fileInput').addEventListener('change', function() {
+    var file = this.files[0];
+    var infoDiv = document.getElementById('fileInfo');
+    if (file) {
+      var sizeMB = (file.size / 1024 / 1024).toFixed(2);
+      infoDiv.textContent = '선택된 파일: ' + file.name + ' (' + sizeMB + ' MB)';
+      infoDiv.classList.remove('d-none');
+    } else {
+      infoDiv.classList.add('d-none');
+    }
+  });
+
+  document.getElementById('uploadForm').addEventListener('submit', function() {
+    var btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.textContent = '처리 중...';
+  });
+</script>
+{% endblock %}
