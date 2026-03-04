@@ -3033,21 +3033,41 @@ def close_list(request):
         except Deadline.DoesNotExist:
             pass
 
-    return render(request,'accounting/close_list.html', {'ym_list': ym_list, 'year_range': range(this_year, 1999, -1), 'selected_year': selected_year, 'accounting_management': 'active','close_list': 'active'})
+    carryover_msg = request.GET.get('carryover_msg', '')
+    return render(request, 'accounting/close_list.html', {
+        'ym_list': ym_list,
+        'year_range': range(this_year, 1999, -1),
+        'selected_year': selected_year,
+        'accounting_management': 'active',
+        'close_list': 'active',
+        'carryover_msg': carryover_msg,
+    })
 
 @login_required(login_url='/')
 def regist_close(request):
     business = get_object_or_404(Business, pk=request.session['business'])
     today = datetime.datetime.now()
+    auto_carryover_msg = None   # 자동이월 결과 메시지
+
     if request.method == "POST":
         ym = request.POST.get('ym')
         year = ym[:4]
         month = ym[5:]
-        
-        main_acct = Account.objects.get(business=business, main=True)
+
+        # Bug5 fix: get() → filter().first()
+        main_acct = Account.objects.filter(business=business, main=True).first()
+        if main_acct is None:
+            return HttpResponse("<script>alert('주계좌가 등록되지 않았습니다. 계좌를 먼저 등록해주세요.');history.back();</script>")
+
         try:
-            tblbank_last_jango = TBLBANK.objects.filter(Bkacctno=main_acct.account_number, Bkdate__year=year, Bkdate__month=month).order_by('Bkdate','id').last().Bkjango
-            transaction_last_jango = Transaction.objects.filter(business=business, Bkdate__year=year, Bkdate__month=month).order_by('Bkdate', 'id').last().Bkjango
+            tblbank_last_jango = TBLBANK.objects.filter(
+                Bkacctno=main_acct.account_number,
+                Bkdate__year=year, Bkdate__month=month
+            ).order_by('Bkdate', 'id').last().Bkjango
+            transaction_last_jango = Transaction.objects.filter(
+                business=business,
+                Bkdate__year=year, Bkdate__month=month
+            ).order_by('Bkdate', 'id').last().Bkjango
         except TBLBANK.DoesNotExist:
             return HttpResponse("<script>alert('등록된 거래가 없습니다.');history.back();</script>")
         except AttributeError:
@@ -3057,14 +3077,93 @@ def regist_close(request):
             deadline, created = Deadline.objects.get_or_create(business=business, year=year, month=month)
             deadline.regdatetime = today
             deadline.save()
+
+            # ── 연말(회기 마지막 월) 마감 시 다음 회계연도 첫 달 이월금 자동 등록 ──
+            int_year = int(year)
+            int_month = int(month)
+            is_kindergarten = (business.type3_id == "어린이집")
+
+            # 회기 마지막 월 판단: 어린이집=2월, 일반=12월
+            is_year_end = (is_kindergarten and int_month == 2) or \
+                          (not is_kindergarten and int_month == 12)
+
+            if is_year_end:
+                # 다음 회기 첫날 계산
+                if is_kindergarten:
+                    next_start = datetime.datetime(int_year + 1, 3, 1)
+                else:
+                    next_start = datetime.datetime(int_year + 1, 1, 1)
+
+                # 마지막 Transaction 잔액 가져오기
+                last_tr = Transaction.objects.filter(
+                    business=business,
+                    Bkdate__year=year, Bkdate__month=month
+                ).order_by('Bkdate', 'id').last()
+
+                # 이월금 목(item) 조회 (관코드0/항코드0/목코드0)
+                try:
+                    carryover_item = Item.objects.get(
+                        paragraph__subsection__institution=business.type3,
+                        paragraph__subsection__code=0,
+                        paragraph__code=0,
+                        code=0
+                    )
+                except Item.DoesNotExist:
+                    carryover_item = None
+
+                if last_tr and carryover_item:
+                    carryover_jango = last_tr.Bkjango
+
+                    # 이미 등록된 이월금이 있으면 건너뜀
+                    existing = Transaction.objects.filter(
+                        business=business,
+                        Bkdate=next_start,
+                        Bkdivision=0
+                    ).first()
+
+                    if existing is None:
+                        # 새 Bkid: 해당 월 마지막 TBLBANK id 사용
+                        last_tblbank = TBLBANK.objects.filter(
+                            Bkacctno=main_acct.account_number,
+                            Bkdate__year=year, Bkdate__month=month
+                        ).order_by('Bkdate', 'Bkid').last()
+
+                        new_bkid = last_tblbank.Bkid if last_tblbank else last_tr.Bkid
+
+                        Transaction.objects.create(
+                            Bkid=new_bkid,
+                            Bkdivision=0,
+                            Mid=request.user.username,
+                            business=business,
+                            Bkacctno=main_acct.account_number,
+                            Bkname=main_acct.bank.name,
+                            Bkdate=next_start,
+                            Bkjukyo="전년도이월금",
+                            Bkinput=carryover_jango,
+                            Bkoutput=0,
+                            Bkjango=carryover_jango,
+                            item=carryover_item,
+                            regdatetime=today
+                        )
+                        next_label = next_start.strftime('%Y년 %m월')
+                        auto_carryover_msg = f"{next_label} 전년도이월금({carryover_jango:,}원)이 자동 등록되었습니다."
+                    else:
+                        next_label = next_start.strftime('%Y년 %m월')
+                        auto_carryover_msg = f"{next_label} 이월금이 이미 등록되어 있어 건너뜁니다."
         else:
             return HttpResponse("<script>alert('주계좌의 잔액과 거래내역의 잔액이 일치하지 않습니다.');history.back();</script>")
-        
+
     response = redirect('close_list')
     if business.type3_id == "어린이집" and int(month) < 3:
-        response['Location'] += '?year='+str(int(year)-1) #회기년도
+        response['Location'] += '?year=' + str(int(year) - 1)  # 회기년도
     else:
-        response['Location'] += '?year='+year   #회기년도
+        response['Location'] += '?year=' + year  # 회기년도
+
+    # 자동이월 메시지가 있으면 쿼리스트링으로 전달
+    if auto_carryover_msg:
+        import urllib.parse
+        response['Location'] += '&carryover_msg=' + urllib.parse.quote(auto_carryover_msg)
+
     return response
 
 @login_required(login_url='/')
