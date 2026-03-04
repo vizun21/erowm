@@ -1,6 +1,10 @@
 {% extends 'accounting/print_base.html' %}
 {% load humanize %}
 
+{% block toolbar_title %}{{ business.name }} {% if voucher_type == 'revenue' %}수입{% else %}지출{% endif %}반납결의서{% endblock %}
+{% block toolbar_sub %}{{ year }}년도{% endblock %}
+{% block pdf_filename %}{{ year }}년_{% if voucher_type == 'revenue' %}수입{% else %}지출{% endif %}반납결의서{% endblock %}
+
 {% block content %}
 {% for data in data_list %}
 <div class="page">

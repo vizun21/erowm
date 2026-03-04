@@ -1,50 +1,93 @@
 {% load static %}
 <!DOCTYPE html>
-<html>
-	<head>
-		<title>인쇄페이지</title>
-		<link rel="stylesheet" href="{% static 'css/print2.css' %}">
-		<style>
-			html, body { height:100%; margin:0px; }
-		</style>
-	</head>
-	<body>
-		<object id="factory" style="display:none" viewastext classid="clsid:1663ed61-23eb-11d2-b92f-008048fdd814" codebase="{% static 'cab/smsx.cab' %}"></object>
-		<script type="text/javascript">
-			function printPage() {
-				//window.print();
-				factory.printing.header = "";  //머릿말 설정 
-				console.log(factory);
-				console.log(factory.printing)
-				factory.printing.footer = " {{ business.name }} ";  //꼬릿말 설정 
-				factory.printing.portrait = false;  //출력방향 설정: true-세로, false-가로 
-				factory.printing.leftMargin = 0;  //왼쪽 여백 설정 
-				factory.printing.topMargin = 0;  //위쪽 여백 설정 
-				factory.printing.rightMargin = 0;  //오른쪽 여백 설정 
-				factory.printing.bottomMargin = 0;  //아래쪽 여백 설정
-				
-				factory.printing.Print(true,window);  //출력하기 
-			}
-		</script>
-		<div class="book" style="font-size:8pt">
-			<div class="no-print-page">
-				<br>
-				<center>
-					<input type='button' value='인쇄하기' class="btnblue" onClick="printPage();">
-					<input type='button' value='닫기' class="btnblue" onclick='top.close();'>
-				</center>
-			</div>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block page_title %}인쇄페이지 (가로){% endblock %}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { height:100%; font-family:'맑은 고딕','나눔고딕',sans-serif; font-size:8pt; background-color:#FAFAFA; }
 
-			{% block content %}
-			{% endblock %}
+        .page {
+            position: relative;
+            width: 29.7cm; min-height: 20.6cm; max-height: 20.6cm;
+            padding: 1cm 1.5cm;
+            margin: 1cm auto;
+            border: 1px #D3D3D3 solid; border-radius: 5px;
+            background: white; box-shadow: 0 0 5px rgba(0,0,0,0.1);
+        }
+        .toolbar {
+            position: fixed; top:0; left:0; right:0; z-index:9999;
+            background:#1e293b; color:#fff;
+            display:flex; align-items:center; justify-content:space-between;
+            padding:8px 20px; box-shadow:0 2px 8px rgba(0,0,0,0.3);
+        }
+        .toolbar-title { font-size: 15px; font-weight: 700; }
+        .toolbar-sub   { font-size: 11px; color: #94a3b8; margin-left: 10px; }
+        .btn-pdf   {background:#16a34a;color:#fff;border:none;border-radius:6px;padding:7px 18px;font-size:13px;font-weight:700;cursor:pointer;margin-left:8px;}
+        .btn-print {background:#3b82f6;color:#fff;border:none;border-radius:6px;padding:7px 18px;font-size:13px;font-weight:700;cursor:pointer;margin-left:8px;}
+        .btn-close {background:#475569;color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:13px;cursor:pointer;margin-left:8px;}
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #000; padding: 2px 3px; font-size: 7pt; vertical-align: middle; }
+        th { background: #e8e8e8; font-weight: bold; text-align: center; }
+        td.right  { text-align: right; }
+        td.center { text-align: center; }
+        td.left   { text-align: left; }
+        h1 { font-size: 14pt; font-weight: bold; letter-spacing: 4px; text-align: center; margin-bottom: 4mm; }
+        h2 { font-size: 11pt; font-weight: bold; text-align: center; margin-bottom: 3mm; }
+        .unit { text-align: right; font-size: 7pt; color: #333; margin-bottom: 2mm; }
 
-			<div class="no-print-page">
-				<center>
-					<input type='button' value='인쇄하기' class="btnblue" onClick="printPage();">
-					<input type='button' value='닫기' class="btnblue" onclick='top.close();'>
-				</center>
-				<br>
-			</div>
-		</div>
-	</body>
+        @page { size: A4 landscape; margin: 0; }
+        @media print {
+            .toolbar { display: none !important; }
+            body { background: white !important; padding-top: 0 !important; }
+            .page { margin:0; border:none; border-radius:0; width:initial; box-shadow:none; min-height:20.6cm; max-height:20.6cm; page-break-after:always; }
+            .page:last-child { page-break-after: auto; }
+        }
+    </style>
+</head>
+<body style="padding-top:52px;">
+    <div class="toolbar">
+        <div>
+            <span class="toolbar-title">{% block toolbar_title %}{{ business.name }} 출력문서 (가로){% endblock %}</span>
+            <span class="toolbar-sub">{% block toolbar_sub %}{% endblock %}</span>
+        </div>
+        <div>
+            <button class="btn-pdf" id="btnPdf">📥 PDF 저장</button>
+            <button class="btn-print" onclick="window.print()">🖨 인쇄</button>
+            <button class="btn-close" onclick="window.close()">✕ 닫기</button>
+        </div>
+    </div>
+    <div id="printArea">
+        {% block content %}{% endblock %}
+    </div>
+    <script>
+    (function(){
+        var btn=document.getElementById('btnPdf');
+        if(!btn)return;
+        var FILENAME='{% block pdf_filename %}출력문서_가로{% endblock %}.pdf';
+        btn.addEventListener('click',function(){
+            btn.disabled=true; btn.textContent='생성 중...';
+            if(window.html2pdf){runPdf();return;}
+            var s=document.createElement('script');
+            s.src='https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js';
+            s.onload=runPdf;
+            s.onerror=function(){btn.disabled=false;btn.innerHTML='📥 PDF 저장';alert('PDF 라이브러리 로드 실패');};
+            document.head.appendChild(s);
+        });
+        function runPdf(){
+            var el=document.getElementById('printArea')||document.body;
+            html2pdf().set({
+                margin:[5,5,5,5], filename:FILENAME,
+                image:{type:'jpeg',quality:0.98},
+                html2canvas:{scale:2,useCORS:true,logging:false,letterRendering:true},
+                jsPDF:{unit:'mm',format:'a4',orientation:'landscape'},
+                pagebreak:{mode:['avoid-all','css','legacy']}
+            }).from(el).save()
+            .then(function(){btn.disabled=false;btn.innerHTML='📥 PDF 저장';})
+            .catch(function(e){btn.disabled=false;btn.innerHTML='📥 PDF 저장';alert('PDF 오류: '+e.message);});
+        }
+    })();
+    </script>
+</body>
 </html>

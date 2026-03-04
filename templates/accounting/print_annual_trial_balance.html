@@ -1,6 +1,10 @@
 {% extends 'accounting/print_base2.html' %}
 {% load humanize %}
 
+{% block toolbar_title %}{{ business.name }} {{ year }}년 월별시산표{% endblock %}
+{% block toolbar_sub %}{{ year }}년도{% endblock %}
+{% block pdf_filename %}{{ year }}년_월별시산표{% endblock %}
+
 {% block content %}
 {% for list in itemList %}
 <div class="page">

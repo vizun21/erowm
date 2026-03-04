@@ -1,6 +1,10 @@
 {% extends 'accounting/print_base.html' %}
 {% load humanize %}
 
+{% block toolbar_title %}{{ business.name }} 현금출납장{% endblock %}
+{% block toolbar_sub %}{{ year }}년 {{ month }}월 ~ {{ year2 }}년 {{ month2 }}월{% endblock %}
+{% block pdf_filename %}{{ year }}년{{ month }}월_현금출납장{% endblock %}
+
 {% block content %}
 {% for ym in ym_range %}
 {% for transaction in ym.transaction %}

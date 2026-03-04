@@ -1,6 +1,10 @@
 {% extends 'accounting/print_base.html' %}
 {% load humanize %}
 
+{% block toolbar_title %}{{ business.name }} 총계정원장{% endblock %}
+{% block toolbar_sub %}{{ year }}년도{% endblock %}
+{% block pdf_filename %}{{ year }}년_총계정원장{% endblock %}
+
 {% block content %}
 {% for item in item_list %}
 {% for transaction in item.transaction %}

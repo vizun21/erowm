@@ -1,6 +1,10 @@
 {% extends 'accounting/print_base.html' %}
 {% load humanize %}
 
+{% block toolbar_title %}{{ business.name }} {{ year }}년 {% if budget_type == 'revenue' %}세입{% else %}세출{% endif %}결산서{% endblock %}
+{% block toolbar_sub %}{{ year }}년도{% endblock %}
+{% block pdf_filename %}{{ year }}년_{% if budget_type == 'revenue' %}세입{% else %}세출{% endif %}결산서{% endblock %}
+
 {% block content %}
 <div class="page">
 	<center><h1>{{ year }}년 {% if budget_type == 'revenue' %}세입{% else %}세출{% endif %}결산서</h1></center>

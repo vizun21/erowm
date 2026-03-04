@@ -1,6 +1,10 @@
 {% extends 'accounting/print_base.html' %}
 {% load humanize %}
 
+{% block toolbar_title %}{{ business.name }} {{ transaction.item.paragraph.subsection.type }}결의서{% endblock %}
+{% block toolbar_sub %}{% endblock %}
+{% block pdf_filename %}{{ transaction.item.paragraph.subsection.type }}결의서{% endblock %}
+
 {% block content %}
 <div class="page">
 	<center><h1>{{ transaction.item.paragraph.subsection.type }}결의서</h1></center>

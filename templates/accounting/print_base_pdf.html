@@ -1,0 +1,191 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>인쇄페이지</title>
+    <style>
+        @font-face {
+            font-family: 'NanumGothic';
+            src: url('{% static "fonts/NanumGothic.ttf" %}');
+            font-weight: normal;
+        }
+        @font-face {
+            font-family: 'NanumGothic';
+            src: url('{% static "fonts/NanumGothicBold.ttf" %}');
+            font-weight: bold;
+        }
+
+        /* ── 공통 초기화 ── */
+        * { box-sizing: border-box; -moz-box-sizing: border-box; margin: 0; padding: 0; }
+
+        html, body {
+            height: 100%;
+            font-family: 'NanumGothic', '맑은 고딕', '나눔고딕', sans-serif;
+            font-size: 8pt;
+            background-color: #FAFAFA;
+        }
+
+        /* ── A4 세로 페이지 (print_base 계열) ── */
+        .page {
+            position: relative;
+            width: 21cm;
+            min-height: 29.3cm;
+            max-height: 29.3cm;
+            padding: 1.5cm 1.5cm 1.5cm 2cm;
+            margin: 1cm auto;
+            border: 1px #D3D3D3 solid;
+            border-radius: 5px;
+            background: white;
+            box-shadow: 0 0 5px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        /* ── A4 가로 페이지 (print_base2 계열) ── */
+        .page-landscape {
+            position: relative;
+            width: 29.7cm;
+            min-height: 20.6cm;
+            max-height: 20.6cm;
+            padding: 1cm 1.5cm;
+            margin: 1cm auto;
+            border: 1px #D3D3D3 solid;
+            border-radius: 5px;
+            background: white;
+            box-shadow: 0 0 5px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        /* ── 툴바 (화면 출력 시에만 표시) ── */
+        .toolbar {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            z-index: 9999;
+            background: #1e293b;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        .toolbar-title { font-size: 15px; font-weight: 700; }
+        .toolbar-sub   { font-size: 11px; color: #94a3b8; margin-left: 10px; }
+        .btn-pdf {
+            background: #16a34a; color: #fff;
+            border: none; border-radius: 6px;
+            padding: 7px 18px; font-size: 13px; font-weight: 700;
+            cursor: pointer; margin-left: 8px;
+        }
+        .btn-print {
+            background: #3b82f6; color: #fff;
+            border: none; border-radius: 6px;
+            padding: 7px 18px; font-size: 13px; font-weight: 700;
+            cursor: pointer; margin-left: 8px;
+        }
+        .btn-close {
+            background: #475569; color: #fff;
+            border: none; border-radius: 6px;
+            padding: 7px 14px; font-size: 13px;
+            cursor: pointer; margin-left: 8px;
+        }
+
+        /* ── 인쇄 / PDF 생성 시 ── */
+        @page {
+            size: A4 portrait;
+            margin: 0;
+        }
+        @media print {
+            .toolbar { display: none !important; }
+            body { background: white !important; padding-top: 0 !important; }
+            .page {
+                margin: 0; border: none; border-radius: 0;
+                width: initial; box-shadow: none;
+                min-height: 29.3cm; max-height: 29.3cm;
+                page-break-after: always;
+            }
+            .page:last-child { page-break-after: auto; }
+        }
+
+        /* ── 표 공통 스타일 ── */
+        table { border-collapse: collapse; width: 100%; }
+        th, td {
+            border: 1px solid #000;
+            padding: 2px 3px;
+            font-size: 7pt;
+            vertical-align: middle;
+            word-break: keep-all;
+        }
+        th { background-color: #e8e8e8; font-weight: bold; text-align: center; }
+        td.right  { text-align: right; }
+        td.center { text-align: center; }
+        td.left   { text-align: left; }
+        h1 { font-size: 14pt; font-weight: bold; letter-spacing: 4px; text-align: center; margin-bottom: 4mm; }
+        h2 { font-size: 11pt; font-weight: bold; text-align: center; margin-bottom: 3mm; }
+        .unit { text-align: right; font-size: 7pt; color: #333; margin-bottom: 2mm; }
+        pre { font-family: inherit; font-size: 6.5pt; margin: 0; white-space: pre-wrap; word-break: break-all; }
+    </style>
+</head>
+<body style="padding-top: 52px;">
+
+    <!-- ── 툴바 ── -->
+    <div class="toolbar">
+        <div>
+            <span class="toolbar-title">{% block toolbar_title %}문서출력{% endblock %}</span>
+            <span class="toolbar-sub">{% block toolbar_sub %}{% endblock %}</span>
+        </div>
+        <div>
+            <button class="btn-pdf" id="btnPdf">📥 PDF 저장</button>
+            <button class="btn-print" onclick="window.print()">🖨 인쇄</button>
+            <button class="btn-close" onclick="window.close()">✕ 닫기</button>
+        </div>
+    </div>
+
+    <!-- ── 본문 ── -->
+    <div id="printArea">
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- ── html2pdf.js PDF 저장 스크립트 ── -->
+    <script>
+    (function () {
+        var btn = document.getElementById('btnPdf');
+        if (!btn) return;
+        var FILENAME = '{% block pdf_filename %}문서{% endblock %}.pdf';
+        var IS_LANDSCAPE = {% block pdf_landscape %}false{% endblock %};
+
+        btn.addEventListener('click', function () {
+            btn.disabled = true;
+            btn.textContent = '생성 중...';
+            if (window.html2pdf) { runPdf(); return; }
+            var s = document.createElement('script');
+            s.src = 'https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js';
+            s.onload = runPdf;
+            s.onerror = function () {
+                btn.disabled = false; btn.innerHTML = '📥 PDF 저장';
+                alert('PDF 라이브러리 로드 실패. 인터넷 연결을 확인하세요.');
+            };
+            document.head.appendChild(s);
+        });
+
+        function runPdf() {
+            var el = document.getElementById('printArea') || document.body;
+            var opt = {
+                margin: IS_LANDSCAPE ? [5, 5, 5, 5] : [8, 8, 8, 15],
+                filename: FILENAME,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true, logging: false, letterRendering: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: IS_LANDSCAPE ? 'landscape' : 'portrait' },
+                pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+            };
+            html2pdf().set(opt).from(el).save().then(function () {
+                btn.disabled = false; btn.innerHTML = '📥 PDF 저장';
+            }).catch(function (e) {
+                btn.disabled = false; btn.innerHTML = '📥 PDF 저장';
+                alert('PDF 생성 오류: ' + e.message);
+            });
+        }
+    })();
+    </script>
+</body>
+</html>

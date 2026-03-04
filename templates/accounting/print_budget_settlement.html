@@ -1,59 +1,67 @@
-{% extends 'accounting/print_base.html' %}
+{% extends 'accounting/print_base_pdf.html' %}
 {% load humanize %}
+
+{% block toolbar_title %}{{ year }}년 {% if budget_type == 'revenue' %}세입{% else %}세출{% endif %}결산서{% endblock %}
+{% block toolbar_sub %}{{ year }}년도{% endblock %}
+{% block pdf_filename %}{{ year }}년_{% if budget_type == 'revenue' %}세입{% else %}세출{% endif %}결산서{% endblock %}
+{% block pdf_landscape %}false{% endblock %}
 
 {% block content %}
 <div class="page">
-	<center><h1>{{ year }}년 {% if budget_type == 'revenue' %}세입{% else %}세출{% endif %}결산서</h1></center>
-	<div style="text-align:right">
-		<p style="margin:2px 2px">(단위 : 원)</p>
-	</div>
-	<table width="100%" height="100%" style="border-collapse:collapse;" border="1" cellpadding="2">
-		<thead>
-			<tr>
-				<th colspan="6" width="60%">과목</th>
-				<th rowspan="2" width="11%">예산액</th>
-				<th rowspan="2" width="11%">{% if budget_type == 'revenue' %}수납액{% else %}지출액{% endif %}</th>
-				<th rowspan="2" width="11%">{% if budget_type == 'revenue' %}미납액{% else %}잔액{% endif %}</th>
-				<th rowspan="2" width="7%">비고</th>
-			</tr>
-			<tr>
-				<th colspan="2" width="20%">관</th>
-				<th colspan="2" width="20%">항</th>
-				<th colspan="2" width="20%">목</th>
-			</tr>
-			<tr>
-				<th colspan="6">총계</th>
-				<th style="text-align:right">{{ total_budget|intcomma }}</th>
-				<th style="text-align:right">{{ total_sum|intcomma }}</th>
-				<th style="text-align:right">{{ total_difference|intcomma }}</th>
-				<th></th>
-			</tr>
-		</thead>
-		<tbody style="text-align:center">
-			{% for subsection in subsection_list %}
-			<tr>
-				<td rowspan="{{ subsection.count }}">{{ subsection.code }}</td>
-				<td rowspan="{{ subsection.count }}">{{ subsection.context }}</td>
-				{% for paragraph in paragraph_list %}
-				{% if paragraph.subsection == subsection %}
-				
-				<td rowspan="{{ paragraph.count }}">{{ subsection.code }}{{ paragraph.code }}</td>
-				<td rowspan="{{ paragraph.count }}">{{ paragraph.context }}</td>
-				{% for item in item_list %}
-				{% if item.paragraph == paragraph %}
-				<td>{{ subsection.code }}{{ paragraph.code }}{{ item.code }}</td>
-				<td style="white-space:nowrap;">{{ item.context }}</td>
-				<td style="text-align:right">{{ item.total_budget|intcomma }}</td>
-				<td style="text-align:right">{{ item.total_sum|intcomma }}</td>
-				<td style="text-align:right">{{ item.total_difference|intcomma }}</td>
-				<td></td>
-			</tr>
-			{% endif %}
-			{% endfor %}
-			{% endif %}
-			{% endfor %}
-			{% endfor %}
-		</tbody>
-	</table>
+    <h1>{{ year }}년 {% if budget_type == 'revenue' %}세입{% else %}세출{% endif %}결산서</h1>
+    <div class="unit">(단위 : 원)</div>
+
+    <table>
+        <thead>
+            <tr>
+                <th colspan="6" style="width:55%">과목</th>
+                <th rowspan="2" style="width:11%">예산액</th>
+                <th rowspan="2" style="width:11%">{% if budget_type == 'revenue' %}수납액{% else %}지출액{% endif %}</th>
+                <th rowspan="2" style="width:11%">{% if budget_type == 'revenue' %}미납액{% else %}잔액{% endif %}</th>
+                <th rowspan="2" style="width:7%">비고</th>
+            </tr>
+            <tr>
+                <th colspan="2" style="width:18%">관</th>
+                <th colspan="2" style="width:18%">항</th>
+                <th colspan="2" style="width:18%">목</th>
+            </tr>
+            <!-- 총계 행 -->
+            <tr style="font-weight:bold; background:#e0e0e0;">
+                <td colspan="6" class="center">총계</td>
+                <td class="right">{{ total_budget|intcomma }}</td>
+                <td class="right">{{ total_sum|intcomma }}</td>
+                <td class="right">{{ total_difference|intcomma }}</td>
+                <td></td>
+            </tr>
+        </thead>
+        <tbody>
+            {% for subsection in subsection_list %}
+            {% for paragraph in paragraph_list %}
+            {% if paragraph.subsection == subsection %}
+            {% for item in item_list %}
+            {% if item.paragraph == paragraph %}
+            <tr>
+                {% if forloop.first and paragraph.forloop.first %}
+                <td rowspan="{{ subsection.count }}" class="center" style="font-weight:bold;">{{ subsection.code }}</td>
+                <td rowspan="{{ subsection.count }}" class="left"  style="font-weight:bold;">{{ subsection.context }}</td>
+                {% endif %}
+                {% if forloop.first %}
+                <td rowspan="{{ paragraph.count }}" class="center">{{ subsection.code }}{{ paragraph.code }}</td>
+                <td rowspan="{{ paragraph.count }}" class="left">{{ paragraph.context }}</td>
+                {% endif %}
+                <td class="center">{{ subsection.code }}{{ paragraph.code }}{{ item.code }}</td>
+                <td class="left" style="white-space:nowrap;">{{ item.context }}</td>
+                <td class="right">{{ item.total_budget|intcomma }}</td>
+                <td class="right">{{ item.total_sum|intcomma }}</td>
+                <td class="right">{{ item.total_difference|intcomma }}</td>
+                <td></td>
+            </tr>
+            {% endif %}
+            {% endfor %}
+            {% endif %}
+            {% endfor %}
+            {% endfor %}
+        </tbody>
+    </table>
 </div>
 {% endblock %}

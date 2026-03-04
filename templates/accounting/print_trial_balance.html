@@ -1,6 +1,10 @@
 {% extends 'accounting/print_base.html' %}
 {% load humanize %}
 
+{% block toolbar_title %}{{ business.name }} 합계잔액시산표{% endblock %}
+{% block toolbar_sub %}{{ year }}년 {{ month }}월 ~ {{ year2 }}년 {{ month2 }}월{% endblock %}
+{% block pdf_filename %}{{ year }}년{{ month }}월_합계잔액시산표{% endblock %}
+
 {% block content %}
 {% for list in itemList %}
 <div class="page">
