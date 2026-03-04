@@ -354,21 +354,27 @@ def business_info(request):
 def account_list(request):
     business = get_object_or_404(Business, pk=request.session['business'])
     lists = Account.objects.filter(business=business)
-    url = "https://ssl.bankda.com/partnership/partner/account_list_userid_xml.php"
-    #headers = {'content-type': 'application/soap+xml'}
-    data = {'service_type': 'basic', 'partner_id': 'vizun21',
-            'user_id': request.user.username, 'user_pw': request.user.password[34:],
-            'char_set': 'utf8'}
-    resMsg = requests.post(url, data=data)
 
-    import xml.etree.ElementTree as ET
-    root = ET.fromstring(resMsg.content.decode('utf-8'))
-
-    for list in lists:
+    # 뱅크다 계좌 상태 조회 (API 오류 시 안전하게 처리)
+    bankda_status_map = {}  # {계좌번호: act_status}
+    try:
+        import xml.etree.ElementTree as ET
+        url = "https://ssl.bankda.com/partnership/partner/account_list_userid_xml.php"
+        data = {'service_type': 'basic', 'partner_id': 'vizun21',
+                'user_id': request.user.username, 'user_pw': request.user.password[34:],
+                'char_set': 'utf8'}
+        resMsg = requests.post(url, data=data, timeout=10)
+        root = ET.fromstring(resMsg.content.decode('utf-8'))
         for account in root.iter("account_info"):
-            if account.attrib['actaccountnum'] == list.account_number:
-                list.act_status = account.attrib['act_status']
-    
+            acctno = account.attrib.get('actaccountnum', '')
+            status = account.attrib.get('act_status', '-')
+            bankda_status_map[acctno] = status
+    except Exception as e:
+        print("뱅크다 계좌조회 오류:", str(e))
+
+    for lst in lists:
+        lst.act_status = bankda_status_map.get(lst.account_number, '-')
+
     return render(request, 'accounting/account_list.html', {'lists': lists, 'business': business, 'accounting_management': 'active', 'account_list': 'active', 'master_login': request.session['master_login']})
 
 @login_required(login_url='/')
@@ -378,7 +384,12 @@ def account_create(request):
     if request.method == "POST":
         account_flag = account_check(request)
         if account_flag == True:
-            Bjumin = business.reg_number.split("-")
+            # 사업자번호 3파트 분리: 'XXX-XX-XXXXX' → [0]='XXX', [1]='XX', [2]='XXXXX'
+            reg = business.reg_number.replace(' ', '')
+            Bjumin = reg.split("-")
+            if len(Bjumin) != 3:
+                raw = reg.replace('-', '')
+                Bjumin = [raw[:3], raw[3:5], raw[5:]]
             url = "https://ssl.bankda.com/partnership/user/account_add.php"
             data = {'directAccess': 'y', 'partner_id': "vizun21", 'service_type': "basic",
                 'user_id': request.user.username, 'user_pw': request.user.password[34:],
@@ -391,12 +402,12 @@ def account_create(request):
                 'webid': request.POST.get('webid'), 'webpw': request.POST.get('webpw'),
                 'renames': request.POST.get('renames'), 'char_set': "utf-8"
             }
-            print(data)
-            resMsg = requests.post(url, data=data)
+            print("[account_create] bankda data:", data)
+            resMsg = requests.post(url, data=data, timeout=10)
             if resMsg.content.decode('utf-8') == "ok":
                 return redirect('account_list')
             else:
-                pass
+                print("[account_create] 뱅크다 오류:", resMsg.content.decode('utf-8'))
                 #등록한 계좌내용 삭제? 오류반환
         else:
             form = AccountForm(request.POST)
@@ -419,7 +430,12 @@ def account_edit(request, pk):
     if request.method == "POST":
         account_flag = account_check(request)
         if account_flag == True:
-            Bjumin = business.reg_number.split("-")
+            # 사업자번호 3파트 분리
+            reg = business.reg_number.replace(' ', '')
+            Bjumin = reg.split("-")
+            if len(Bjumin) != 3:
+                raw = reg.replace('-', '')
+                Bjumin = [raw[:3], raw[3:5], raw[5:]]
             url = "https://ssl.bankda.com/partnership/user/account_fix.php"
             data = {'directAccess': 'y', 'partner_id': "vizun21", 'service_type': "basic",
                 'user_id': request.user.username, 'user_pw': request.user.password[34:],
@@ -432,13 +448,12 @@ def account_edit(request, pk):
                 'webid': request.POST.get('webid'), 'webpw': request.POST.get('webpw'),
                 'renames': request.POST.get('renames'), 'char_set': "utf-8"
             }
-            print(data)
-            resMsg = requests.post(url, data=data)
+            print("[account_edit] bankda data:", data)
+            resMsg = requests.post(url, data=data, timeout=10)
             if resMsg.content.decode('utf-8') == "ok":
                 return redirect('account_list')
             else:
-                print(resMsg.content.decode('utf-8'))
-                print("뱅크다등록오류")
+                print("[account_edit] 뱅크다 오류:", resMsg.content.decode('utf-8'))
                 #등록한 계좌내용 삭제? 오류반환
         else:
             form = AccountForm(request.POST, instance=account)
@@ -1157,14 +1172,30 @@ def database_syn(request):
         num = 1
 
     for data in data_list:
-        business = Business.objects.get(account__account_number=data['Bkacctno'])
+        try:
+            business = Business.objects.get(account__account_number=data['Bkacctno'])
+        except Business.DoesNotExist:
+            print("[database_syn] 계좌번호 매칭 사업장 없음:", data.get('Bkacctno'))
+            continue
+
+        # Bkdate: 뱅크다는 'YYYYMMDD' 또는 'YYYYMMDDHHMMSS' 형식으로 전달
+        raw_date = str(data['Bkdate']).replace('-', '').replace(' ', '').replace(':', '')
+        try:
+            if len(raw_date) >= 14:
+                bkdate_str = raw_date[:4]+'-'+raw_date[4:6]+'-'+raw_date[6:8]+' '+raw_date[8:10]+':'+raw_date[10:12]+':'+raw_date[12:14]
+            else:
+                bkdate_str = raw_date[:4]+'-'+raw_date[4:6]+'-'+raw_date[6:8]
+        except Exception:
+            bkdate_str = str(data['Bkdate'])[:10]
+
         TBLBANK.objects.create(
             Bkid=num,
             Bkdivision=1,
+            direct=False,
             Mid=data['Mid'],
             Bkacctno=data['Bkacctno'],
             Bkname=data['Bkname'],
-            Bkdate=data['Bkdate'][:4]+'-'+data['Bkdate'][4:6]+'-'+data['Bkdate'][6:],
+            Bkdate=bkdate_str,
             Bkjukyo=data['Bkjukyo'],
             Bkinput=data['Bkinput'],
             Bkoutput=data['Bkoutput'],
